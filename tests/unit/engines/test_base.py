@@ -3,13 +3,10 @@ from collections.abc import AsyncIterator
 import pytest
 
 from app.engines.base import BaseSTTEngine, BaseTTSEngine
-from app.models.engine import EngineConfig, STTChunk, STTOutput, TTSChunk, TTSOutput
+from app.models.engine import EngineConfig, STTChunk, STTResponse, TTSChunk, TTSResponse
 from app.models.metrics import (
-    QualityMetrics,
-    STTInvokePerformanceMetrics,
-    STTStreamPerformanceMetrics,
-    TTSInvokePerformanceMetrics,
-    TTSStreamPerformanceMetrics,
+    STTPerformanceMetrics,
+    TTSPerformanceMetrics,
 )
 from app.utils.exceptions import EngineNotReadyError
 
@@ -34,12 +31,11 @@ class MockSTTEngine(BaseSTTEngine):
 
     async def transcribe(
         self, audio_data: bytes, language: str | None = None
-    ) -> STTOutput:
+    ) -> STTResponse:
         await self._ensure_ready()  # Auto-initialize if needed
-        return STTOutput(
+        return STTResponse(
             text="mock transcription",
-            quality_metrics=QualityMetrics(),
-            performance_metrics=STTInvokePerformanceMetrics(
+            performance_metrics=STTPerformanceMetrics(
                 latency_ms=100.0, processing_time_ms=95.0
             ),
         )
@@ -50,10 +46,7 @@ class MockSTTEngine(BaseSTTEngine):
         yield STTChunk(
             text="mock",
             is_final=True,
-            performance_metrics=STTStreamPerformanceMetrics(
-                time_to_first_token_ms=250.0,
-                chunk_latency_ms=50.0,
-            ),
+            chunk_latency_ms=50.0,
         )
 
     @property
@@ -84,14 +77,13 @@ class MockTTSEngine(BaseTTSEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
-    ) -> TTSOutput:
+    ) -> TTSResponse:
         await self._ensure_ready()  # Auto-initialize if needed
-        return TTSOutput(
+        return TTSResponse(
             audio_data=b"mock audio",
             sample_rate=22050,
             duration_seconds=1.0,
-            quality_metrics=QualityMetrics(),
-            performance_metrics=TTSInvokePerformanceMetrics(
+            performance_metrics=TTSPerformanceMetrics(
                 latency_ms=100.0, processing_time_ms=95.0
             ),
         )
@@ -99,11 +91,9 @@ class MockTTSEngine(BaseTTSEngine):
     async def synthesize_stream(self, text: str, **kwargs) -> AsyncIterator[TTSChunk]:
         yield TTSChunk(
             audio_data=b"mock",
+            sequence_number=0,
             is_final=True,
-            performance_metrics=TTSStreamPerformanceMetrics(
-                time_to_first_token_ms=150.0,
-                chunk_latency_ms=30.0,
-            ),
+            chunk_latency_ms=30.0,
         )
 
     @property

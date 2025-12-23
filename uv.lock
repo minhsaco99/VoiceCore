@@ -307,7 +307,7 @@ wheels = [
 ]
 
 [[package]]
-name = "voice-engine-api"
+name = "voice-core"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

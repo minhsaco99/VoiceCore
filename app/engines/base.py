@@ -7,13 +7,13 @@ Key design principles:
 - Lifecycle management (initialize, close, is_ready)
 - Auto-initialization on first use
 - Context manager support
-- Standardized I/O via EngineConfig, STTOutput, TTSOutput
+- Standardized I/O via EngineConfig, STTResponse, TTSResponse
 """
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
-from app.models.engine import EngineConfig, STTChunk, STTOutput, TTSChunk, TTSOutput
+from app.models.engine import EngineConfig, STTChunk, STTResponse, TTSChunk, TTSResponse
 from app.utils.exceptions import EngineNotReadyError
 
 
@@ -113,8 +113,8 @@ class BaseSTTEngine(BaseEngine):
     All STT engines must inherit from this class and implement:
     - _initialize() - Load models/resources
     - _cleanup() - Cleanup resources
-    - transcribe() - Batch processing (returns STTOutput with STTInvokePerformanceMetrics)
-    - transcribe_stream() - Streaming (yields STTChunk with STTStreamPerformanceMetrics)
+    - transcribe() - Batch processing (returns STTResponse with STTPerformanceMetrics)
+    - transcribe_stream() - Streaming (yields STTChunk, summary with STTStreamSummary)
     - supported_formats property
     - engine_name property
 
@@ -128,7 +128,7 @@ class BaseSTTEngine(BaseEngine):
     @abstractmethod
     async def transcribe(
         self, audio_data: bytes, language: str | None = None
-    ) -> STTOutput:
+    ) -> STTResponse:
         """
         Transcribe audio (invoke/batch mode)
 
@@ -137,7 +137,7 @@ class BaseSTTEngine(BaseEngine):
             language: Optional language hint (e.g., "en", "es")
 
         Returns:
-            STTOutput with text and STTInvokePerformanceMetrics
+            STTResponse with text and STTPerformanceMetrics
         """
         pass
 
@@ -152,7 +152,7 @@ class BaseSTTEngine(BaseEngine):
             audio_stream: Async iterator of audio chunks
 
         Yields:
-            STTChunk with partial/final text and STTStreamPerformanceMetrics
+            STTChunk with partial/final text (STTStreamSummary at end)
         """
         pass
 
@@ -170,8 +170,8 @@ class BaseTTSEngine(BaseEngine):
     All TTS engines must implement:
     - _initialize() - Load models/resources
     - _cleanup() - Cleanup resources
-    - synthesize() - Batch processing (returns TTSOutput with TTSInvokePerformanceMetrics)
-    - synthesize_stream() - Streaming (yields TTSChunk with TTSStreamPerformanceMetrics)
+    - synthesize() - Batch processing (returns TTSResponse with TTSPerformanceMetrics)
+    - synthesize_stream() - Streaming (yields TTSChunk, summary with TTSStreamSummary)
     - supported_voices property
     - engine_name property
 
@@ -184,7 +184,7 @@ class BaseTTSEngine(BaseEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
-    ) -> TTSOutput:
+    ) -> TTSResponse:
         """
         Synthesize text to speech (invoke/batch mode)
 
@@ -194,7 +194,7 @@ class BaseTTSEngine(BaseEngine):
             speed: Speech speed (1.0 = normal, overrides config default)
 
         Returns:
-            TTSOutput with audio and TTSInvokePerformanceMetrics
+            TTSResponse with audio and TTSPerformanceMetrics
         """
         pass
 
@@ -208,7 +208,7 @@ class BaseTTSEngine(BaseEngine):
             **kwargs: Engine-specific params (voice, speed, etc.)
 
         Yields:
-            TTSChunk with audio and TTSStreamPerformanceMetrics
+            TTSChunk with audio chunks (TTSStreamSummary at end)
         """
         pass
 
