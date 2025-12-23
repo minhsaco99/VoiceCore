@@ -1,7 +1,7 @@
 [project]
-name = "voice-engine-api"
+name = "voice-core"
 version = "0.1.0"
-description = "Voice Engine API with STT and TTS capabilities"
+description = "Voice Core Engine"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
