@@ -41,12 +41,6 @@ class EngineConfig(BaseModel):
     max_workers: int = Field(default=1, ge=1, description="Max parallel workers")
     timeout_seconds: int = Field(default=300, ge=1, description="Processing timeout")
 
-    # Engine-specific parameters (flexible dict)
-    engine_params: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Engine-specific parameters (e.g., temperature, beam_size, api_keys)",
-    )
-
 
 # =============================================================================
 # Request Models

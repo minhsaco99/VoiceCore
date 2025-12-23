@@ -30,7 +30,6 @@ class TestEngineConfig:
         assert config.device == "cpu"  # Default
         assert config.max_workers == 1  # Default
         assert config.timeout_seconds == 300  # Default
-        assert config.engine_params == {}  # Default
 
     def test_create_config_with_all_fields(self):
         """Should create config with all fields"""
@@ -39,14 +38,12 @@ class TestEngineConfig:
             device="cuda",
             max_workers=4,
             timeout_seconds=600,
-            engine_params={"language": "en", "temperature": 0.0},
         )
 
         assert config.model_name == "whisper-large"
         assert config.device == "cuda"
         assert config.max_workers == 4
         assert config.timeout_seconds == 600
-        assert config.engine_params == {"language": "en", "temperature": 0.0}
 
     def test_config_validates_device(self):
         """Device should only accept cpu, cuda, or mps"""
