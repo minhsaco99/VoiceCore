@@ -51,10 +51,14 @@ test-watch:
 install:
 	@echo "Installing dependencies..."
 	uv sync
+	@echo "Installing pre-commit hooks..."
+	uv run pre-commit install
 
 dev:
 	@echo "Installing dev dependencies..."
 	uv sync --dev
+	@echo "Installing pre-commit hooks..."
+	uv run pre-commit install
 
 # Code Quality
 lint:
