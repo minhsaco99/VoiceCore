@@ -1,4 +1,5 @@
 """Audio processing utilities for voice engine"""
+
 import io
 import pathlib
 
@@ -58,9 +59,7 @@ class AudioProcessor:
                 raise
             raise InvalidAudioError(f"Failed to process audio data: {e}") from e
 
-    def resample_to_16khz(
-        self, audio: np.ndarray, current_sr: int
-    ) -> np.ndarray:
+    def resample_to_16khz(self, audio: np.ndarray, current_sr: int) -> np.ndarray:
         """
         Resample audio to 16kHz (Whisper requirement)
 
@@ -80,9 +79,7 @@ class AudioProcessor:
             audio = librosa.to_mono(audio)
 
         # Resample to 16kHz
-        resampled = librosa.resample(
-            audio, orig_sr=current_sr, target_sr=16000
-        )
+        resampled = librosa.resample(audio, orig_sr=current_sr, target_sr=16000)
 
         return resampled
 
@@ -104,9 +101,7 @@ class AudioProcessor:
             raise InvalidAudioError("Audio is empty")
 
         if sample_rate <= 0:
-            raise InvalidAudioError(
-                f"Invalid sample rate: {sample_rate}"
-            )
+            raise InvalidAudioError(f"Invalid sample rate: {sample_rate}")
 
         duration_seconds = len(audio) / sample_rate
         return duration_seconds * 1000.0

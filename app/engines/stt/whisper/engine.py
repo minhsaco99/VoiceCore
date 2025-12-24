@@ -1,4 +1,5 @@
 """Whisper STT Engine implementation using faster-whisper"""
+
 import time
 from collections.abc import AsyncIterator
 
@@ -161,7 +162,9 @@ class WhisperSTTEngine(BaseSTTEngine):
         # Calculate metrics
         latency_ms = (end_time - start_time) * 1000
         processing_time_ms = (processing_end - processing_start) * 1000
-        real_time_factor = processing_time_ms / audio_duration_ms if audio_duration_ms > 0 else None
+        real_time_factor = (
+            processing_time_ms / audio_duration_ms if audio_duration_ms > 0 else None
+        )
 
         metrics = STTPerformanceMetrics(
             latency_ms=latency_ms,

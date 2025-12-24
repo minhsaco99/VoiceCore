@@ -1,4 +1,5 @@
 """Audio type definitions for voice engine"""
+
 import io
 import pathlib
 

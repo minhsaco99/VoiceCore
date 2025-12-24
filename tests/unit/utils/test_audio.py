@@ -1,4 +1,5 @@
 """Tests for audio processing utilities"""
+
 import io
 import pathlib
 from unittest.mock import MagicMock, mock_open, patch
@@ -159,9 +160,10 @@ class TestAudioProcessorResample:
         fake_stereo = np.random.randn(2, 44100).astype(np.float32)
         processor = AudioProcessor()
 
-        with patch("librosa.to_mono") as mock_to_mono, \
-             patch("librosa.resample") as mock_resample:
-
+        with (
+            patch("librosa.to_mono") as mock_to_mono,
+            patch("librosa.resample") as mock_resample,
+        ):
             fake_mono = np.random.randn(44100).astype(np.float32)
             mock_to_mono.return_value = fake_mono
             mock_resample.return_value = np.random.randn(16000).astype(np.float32)

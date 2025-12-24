@@ -1,4 +1,5 @@
 """Tests for audio type definitions"""
+
 import io
 import pathlib
 

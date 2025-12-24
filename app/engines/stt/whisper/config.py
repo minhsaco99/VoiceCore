@@ -1,4 +1,5 @@
 """Configuration for Whisper STT engine"""
+
 from pydantic import Field, field_validator
 
 from app.models.engine import EngineConfig

@@ -1,4 +1,5 @@
 """Tests for Whisper STT engine"""
+
 import io
 import pathlib
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -72,7 +73,15 @@ class TestWhisperConfig:
         """WhisperConfig should accept valid Whisper model names"""
         from app.engines.stt.whisper.config import WhisperConfig
 
-        valid_models = ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3"]
+        valid_models = [
+            "tiny",
+            "base",
+            "small",
+            "medium",
+            "large",
+            "large-v2",
+            "large-v3",
+        ]
 
         for model in valid_models:
             config = WhisperConfig(model_name=model)
@@ -98,10 +107,7 @@ class TestWhisperConfig:
         valid_types = ["int8", "float16", "float32"]
 
         for compute_type in valid_types:
-            config = WhisperConfig(
-                model_name="base",
-                compute_type=compute_type
-            )
+            config = WhisperConfig(model_name="base", compute_type=compute_type)
             assert config.compute_type == compute_type
 
     def test_whisper_config_invalid_compute_type_raises(self):
@@ -112,10 +118,7 @@ class TestWhisperConfig:
 
         for compute_type in invalid_types:
             with pytest.raises(ValidationError) as exc_info:
-                WhisperConfig(
-                    model_name="base",
-                    compute_type=compute_type
-                )
+                WhisperConfig(model_name="base", compute_type=compute_type)
 
             # Check error message
             assert "compute_type must be one of" in str(exc_info.value)
@@ -281,6 +284,7 @@ class TestWhisperSTTEngineAudioFormats:
     @pytest.fixture
     def whisper_config(self):
         from app.engines.stt.whisper.config import WhisperConfig
+
         return WhisperConfig(model_name="base")
 
     @pytest.fixture
@@ -296,7 +300,9 @@ class TestWhisperSTTEngineAudioFormats:
             yield mock_instance
 
     @pytest.mark.asyncio
-    async def test_transcribe_with_bytes_input(self, whisper_config, mock_whisper_model):
+    async def test_transcribe_with_bytes_input(
+        self, whisper_config, mock_whisper_model
+    ):
         """Should accept bytes input (WAV format)"""
         from app.engines.stt.whisper.engine import WhisperSTTEngine
 
@@ -314,7 +320,9 @@ class TestWhisperSTTEngineAudioFormats:
             assert result.text is not None
 
     @pytest.mark.asyncio
-    async def test_transcribe_with_numpy_input(self, whisper_config, mock_whisper_model):
+    async def test_transcribe_with_numpy_input(
+        self, whisper_config, mock_whisper_model
+    ):
         """Should accept numpy array input"""
         from app.engines.stt.whisper.engine import WhisperSTTEngine
 
@@ -332,7 +340,9 @@ class TestWhisperSTTEngineAudioFormats:
             assert result.text is not None
 
     @pytest.mark.asyncio
-    async def test_transcribe_with_filepath_input(self, whisper_config, mock_whisper_model):
+    async def test_transcribe_with_filepath_input(
+        self, whisper_config, mock_whisper_model
+    ):
         """Should accept pathlib.Path input"""
         from app.engines.stt.whisper.engine import WhisperSTTEngine
 
@@ -349,7 +359,9 @@ class TestWhisperSTTEngineAudioFormats:
             assert isinstance(result, STTResponse)
 
     @pytest.mark.asyncio
-    async def test_transcribe_with_bytesio_input(self, whisper_config, mock_whisper_model):
+    async def test_transcribe_with_bytesio_input(
+        self, whisper_config, mock_whisper_model
+    ):
         """Should accept io.BytesIO input"""
         from app.engines.stt.whisper.engine import WhisperSTTEngine
 
@@ -398,6 +410,7 @@ class TestWhisperSTTEngineTranscription:
     @pytest.fixture
     def whisper_config(self):
         from app.engines.stt.whisper.config import WhisperConfig
+
         return WhisperConfig(model_name="base")
 
     @pytest.mark.asyncio
@@ -407,9 +420,10 @@ class TestWhisperSTTEngineTranscription:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -433,9 +447,10 @@ class TestWhisperSTTEngineTranscription:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -473,9 +488,10 @@ class TestWhisperSTTEngineTranscription:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             # Very short audio (< 0.1s)
             mock_processor.to_numpy.return_value = (np.array([0.1]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1])
@@ -496,9 +512,10 @@ class TestWhisperSTTEngineTranscription:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -521,9 +538,10 @@ class TestWhisperSTTEngineTranscription:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -547,6 +565,7 @@ class TestWhisperSTTEngineMetrics:
     @pytest.fixture
     def whisper_config(self):
         from app.engines.stt.whisper.config import WhisperConfig
+
         return WhisperConfig(model_name="base")
 
     @pytest.mark.asyncio
@@ -556,9 +575,10 @@ class TestWhisperSTTEngineMetrics:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -582,9 +602,10 @@ class TestWhisperSTTEngineMetrics:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -607,9 +628,10 @@ class TestWhisperSTTEngineMetrics:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -632,9 +654,10 @@ class TestWhisperSTTEngineMetrics:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 500.0
@@ -657,9 +680,10 @@ class TestWhisperSTTEngineMetrics:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 1000.0
@@ -682,13 +706,19 @@ class TestWhisperSTTEngineMetrics:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model, \
-             patch("time.time") as mock_time:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+            patch("time.time") as mock_time,
+        ):
             # Mock time to control RTF calculation
             # Need 4 time calls: start, processing_start, processing_end, end
-            mock_time.side_effect = [0.0, 0.0, 0.5, 0.5]  # 500ms total, 500ms processing
+            mock_time.side_effect = [
+                0.0,
+                0.0,
+                0.5,
+                0.5,
+            ]  # 500ms total, 500ms processing
 
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
@@ -713,9 +743,10 @@ class TestWhisperSTTEngineMetrics:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -740,6 +771,7 @@ class TestWhisperSTTEngineSegments:
     @pytest.fixture
     def whisper_config(self):
         from app.engines.stt.whisper.config import WhisperConfig
+
         return WhisperConfig(model_name="base")
 
     @pytest.mark.asyncio
@@ -749,16 +781,17 @@ class TestWhisperSTTEngineSegments:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
 
             mock_instance = MagicMock()
             mock_model.return_value = mock_instance
-            
+
             # Mock Whisper response with word-level timestamps
             mock_segment = MagicMock()
             mock_segment.text = "Hello world"
@@ -782,16 +815,17 @@ class TestWhisperSTTEngineSegments:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
 
             mock_instance = MagicMock()
             mock_model.return_value = mock_instance
-            
+
             mock_segment = MagicMock()
             mock_segment.text = "Hello"
             mock_segment.words = [
@@ -815,16 +849,17 @@ class TestWhisperSTTEngineSegments:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
 
             mock_instance = MagicMock()
             mock_model.return_value = mock_instance
-            
+
             mock_segment = MagicMock()
             mock_segment.text = "Test word"
             mock_segment.words = [
@@ -848,16 +883,17 @@ class TestWhisperSTTEngineSegments:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
 
             mock_instance = MagicMock()
             mock_model.return_value = mock_instance
-            
+
             mock_segment = MagicMock()
             mock_segment.text = "Test"
             mock_word = MagicMock(word="Test", start=0.0, end=0.5)
@@ -877,16 +913,17 @@ class TestWhisperSTTEngineSegments:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
 
             mock_instance = MagicMock()
             mock_model.return_value = mock_instance
-            
+
             mock_segment = MagicMock()
             mock_segment.text = "One two three"
             mock_segment.words = [
@@ -909,16 +946,17 @@ class TestWhisperSTTEngineSegments:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
 
             mock_instance = MagicMock()
             mock_model.return_value = mock_instance
-            
+
             mock_segment = MagicMock()
             mock_segment.text = "Hello world"
             mock_segment.words = [
@@ -941,16 +979,17 @@ class TestWhisperSTTEngineSegments:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
 
             mock_instance = MagicMock()
             mock_model.return_value = mock_instance
-            
+
             # Mock segment without words attribute
             mock_segment = MagicMock()
             mock_segment.text = "Hello"
@@ -969,6 +1008,7 @@ class TestWhisperSTTEngineErrorHandling:
     @pytest.fixture
     def whisper_config(self):
         from app.engines.stt.whisper.config import WhisperConfig
+
         return WhisperConfig(model_name="base")
 
     @pytest.mark.asyncio
@@ -981,9 +1021,10 @@ class TestWhisperSTTEngineErrorHandling:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -994,6 +1035,7 @@ class TestWhisperSTTEngineErrorHandling:
 
             # Simulate timeout by making transcribe take too long
             import asyncio
+
             async def slow_transcribe(*args, **kwargs):
                 await asyncio.sleep(10)  # Longer than timeout
                 return ([], {})
@@ -1001,7 +1043,10 @@ class TestWhisperSTTEngineErrorHandling:
             # Since Whisper's transcribe is sync, we can't easily test timeout
             # This test documents that timeout handling should be implemented
             # For now, just verify the engine doesn't crash
-            mock_instance.transcribe.return_value = ([{"text": "Test"}], {"language": "en"})
+            mock_instance.transcribe.return_value = (
+                [{"text": "Test"}],
+                {"language": "en"},
+            )
 
             result = await engine.transcribe(np.array([0.1, 0.2]))
             assert result is not None  # Basic functionality works
@@ -1013,9 +1058,10 @@ class TestWhisperSTTEngineErrorHandling:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -1034,9 +1080,10 @@ class TestWhisperSTTEngineErrorHandling:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
@@ -1046,7 +1093,9 @@ class TestWhisperSTTEngineErrorHandling:
             mock_instance.transcribe.side_effect = ValueError("Invalid language: zz")
 
             with pytest.raises((TranscriptionError, ValidationError, ValueError)):
-                await engine.transcribe(np.array([0.1, 0.2]), language="invalid_lang_zz")
+                await engine.transcribe(
+                    np.array([0.1, 0.2]), language="invalid_lang_zz"
+                )
 
     @pytest.mark.asyncio
     async def test_transcribe_audio_too_large_raises(self, whisper_config):
@@ -1072,7 +1121,9 @@ class TestWhisperSTTEngineErrorHandling:
         engine = WhisperSTTEngine(whisper_config)
 
         with patch.object(engine, "_audio_processor") as mock_processor:
-            mock_processor.to_numpy.side_effect = UnsupportedFormatError("JPEG not supported")
+            mock_processor.to_numpy.side_effect = UnsupportedFormatError(
+                "JPEG not supported"
+            )
 
             with pytest.raises(UnsupportedFormatError):
                 await engine.transcribe(b"fake jpeg data")
@@ -1106,6 +1157,7 @@ class TestWhisperSTTEngineProperties:
     @pytest.fixture
     def whisper_config(self):
         from app.engines.stt.whisper.config import WhisperConfig
+
         return WhisperConfig(model_name="base")
 
     def test_engine_name_is_whisper(self, whisper_config):
@@ -1156,6 +1208,7 @@ class TestWhisperSTTEngineCoverageGaps:
     @pytest.fixture
     def whisper_config(self):
         from app.engines.stt.whisper.config import WhisperConfig
+
         return WhisperConfig(model_name="base")
 
     @pytest.mark.asyncio
@@ -1165,25 +1218,33 @@ class TestWhisperSTTEngineCoverageGaps:
 
         engine = WhisperSTTEngine(whisper_config)
 
-        with patch.object(engine, "_audio_processor") as mock_processor, \
-             patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model:
-            
+        with (
+            patch.object(engine, "_audio_processor") as mock_processor,
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model,
+        ):
             mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
             mock_processor.resample_to_16khz.return_value = np.array([0.1, 0.2])
             mock_processor.get_duration_ms.return_value = 100.0
 
             mock_instance = MagicMock()
             mock_model.return_value = mock_instance
-            
+
             # Return dict-based segments with dict-based words
             mock_instance.transcribe.return_value = (
-                [{
-                    "text": "Hello",
-                    "words": [
-                        {"word": "Hello", "start": 0.0, "end": 0.5, "probability": 0.95}
-                    ]
-                }],
-                {"language": "en"}
+                [
+                    {
+                        "text": "Hello",
+                        "words": [
+                            {
+                                "word": "Hello",
+                                "start": 0.0,
+                                "end": 0.5,
+                                "probability": 0.95,
+                            }
+                        ],
+                    }
+                ],
+                {"language": "en"},
             )
 
             result = await engine.transcribe(np.array([0.1, 0.2]))
@@ -1202,8 +1263,8 @@ class TestWhisperSTTEngineCoverageGaps:
         engine = WhisperSTTEngine(whisper_config)
 
         # Verify the method exists and is documented as not implemented
-        assert hasattr(engine, 'transcribe_stream')
-        assert 'NOT IMPLEMENTED' in engine.transcribe_stream.__doc__
+        assert hasattr(engine, "transcribe_stream")
+        assert "NOT IMPLEMENTED" in engine.transcribe_stream.__doc__
 
     @pytest.mark.asyncio
     async def test_model_none_after_failed_init(self, whisper_config):
@@ -1211,7 +1272,7 @@ class TestWhisperSTTEngineCoverageGaps:
         from app.engines.stt.whisper.engine import WhisperSTTEngine
 
         engine = WhisperSTTEngine(whisper_config)
-        
+
         # Manually set _model to None to simulate failed initialization
         engine._initialized = True  # Bypass auto-init
         engine._model = None
