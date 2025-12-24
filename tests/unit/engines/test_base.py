@@ -8,7 +8,7 @@ from app.models.metrics import (
     STTPerformanceMetrics,
     TTSPerformanceMetrics,
 )
-from app.utils.exceptions import EngineNotReadyError
+from app.exceptions import EngineNotReadyError
 
 
 # Create concrete test implementations

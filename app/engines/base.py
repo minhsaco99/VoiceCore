@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
 from app.models.engine import EngineConfig, STTChunk, STTResponse, TTSChunk, TTSResponse
-from app.utils.exceptions import EngineNotReadyError
+from app.exceptions import EngineNotReadyError
 
 
 class BaseEngine(ABC):

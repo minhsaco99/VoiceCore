@@ -118,6 +118,12 @@ class TimeoutError(VoiceEngineError):
     pass
 
 
+class TranscriptionTimeoutError(TimeoutError):
+    """STT transcription timeout"""
+
+    pass
+
+
 # Registry
 class EngineNotFoundError(VoiceEngineError):
     """Engine not registered"""
