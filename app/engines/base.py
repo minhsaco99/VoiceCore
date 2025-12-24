@@ -127,7 +127,7 @@ class BaseSTTEngine(BaseEngine):
 
     @abstractmethod
     async def transcribe(
-        self, audio_data: bytes, language: str | None = None
+        self, audio_data: bytes, language: str | None = None, **kwargs
     ) -> STTResponse:
         """
         Transcribe audio (invoke/batch mode)
@@ -135,6 +135,7 @@ class BaseSTTEngine(BaseEngine):
         Args:
             audio_data: Audio file as bytes
             language: Optional language hint (e.g., "en", "es")
+            **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Returns:
             STTResponse with text and STTPerformanceMetrics
@@ -143,13 +144,14 @@ class BaseSTTEngine(BaseEngine):
 
     @abstractmethod
     async def transcribe_stream(
-        self, audio_stream: AsyncIterator[bytes]
+        self, audio_stream: AsyncIterator[bytes], **kwargs
     ) -> AsyncIterator[STTChunk]:
         """
         Transcribe audio stream (streaming mode)
 
         Args:
             audio_stream: Async iterator of audio chunks
+            **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Yields:
             STTChunk with partial/final text (STTStreamSummary at end)
@@ -180,10 +182,7 @@ class BaseTTSEngine(BaseEngine):
 
     @abstractmethod
     async def synthesize(
-        self,
-        text: str,
-        voice: str | None = None,
-        speed: float = 1.0,
+        self, text: str, voice: str | None = None, speed: float = 1.0, **kwargs
     ) -> TTSResponse:
         """
         Synthesize text to speech (invoke/batch mode)
@@ -192,6 +191,7 @@ class BaseTTSEngine(BaseEngine):
             text: Text to synthesize
             voice: Optional voice name (overrides config default)
             speed: Speech speed (1.0 = normal, overrides config default)
+            **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Returns:
             TTSResponse with audio and TTSPerformanceMetrics

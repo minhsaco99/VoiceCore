@@ -51,7 +51,7 @@ class WhisperSTTEngine(BaseSTTEngine):
         self._model = None
 
     async def transcribe(
-        self, audio_data: AudioInput, language: str | None = None
+        self, audio_data: AudioInput, language: str | None = None, **kwargs
     ) -> STTResponse:
         """
         Transcribe audio to text (invoke mode)
@@ -59,6 +59,8 @@ class WhisperSTTEngine(BaseSTTEngine):
         Args:
             audio_data: Audio in bytes, numpy, Path, or BytesIO format
             language: Optional language hint (e.g., "en", "es")
+            **kwargs: Additional Whisper parameters (overrides config defaults)
+                     Examples: temperature, vad_filter, beam_size, etc.
 
         Returns:
             STTResponse with text, segments, and performance metrics
@@ -93,15 +95,23 @@ class WhisperSTTEngine(BaseSTTEngine):
         processing_start = time.time()
 
         try:
-            # Use language hint if provided, otherwise from config
-            lang = language or self.whisper_config.language
+            # Build parameters: config defaults + request overrides
+            params = {
+                "language": language or self.whisper_config.language,
+                "beam_size": self.whisper_config.beam_size,
+                "temperature": self.whisper_config.temperature,
+                "vad_filter": self.whisper_config.vad_filter,
+                "condition_on_previous_text": self.whisper_config.condition_on_previous_text,
+                "compression_ratio_threshold": self.whisper_config.compression_ratio_threshold,
+                "log_prob_threshold": self.whisper_config.log_prob_threshold,
+                "no_speech_threshold": self.whisper_config.no_speech_threshold,
+                "word_timestamps": True,  # Always enable for segments
+            }
 
-            segments_iter, info = self._model.transcribe(
-                audio_16k,
-                language=lang,
-                beam_size=self.whisper_config.beam_size,
-                word_timestamps=True,
-            )
+            # Override with request-specific params from engine_params
+            params.update(kwargs)
+
+            segments_iter, info = self._model.transcribe(audio_16k, **params)
 
             # Convert iterator to list
             segments_list = list(segments_iter)
@@ -188,12 +198,16 @@ class WhisperSTTEngine(BaseSTTEngine):
         )
 
     async def transcribe_stream(
-        self, audio_stream: AsyncIterator[bytes]
+        self, audio_stream: AsyncIterator[bytes], **kwargs
     ) -> AsyncIterator[STTChunk]:
         """
         Transcribe audio stream (streaming mode) - NOT IMPLEMENTED
 
         Deferred to future iteration.
+
+        Args:
+            audio_stream: Async iterator of audio chunks
+            **kwargs: Additional Whisper parameters (for future use)
 
         Raises:
             NotImplementedError: Streaming not yet supported
