@@ -7,8 +7,8 @@ import librosa
 import numpy as np
 import soundfile as sf
 
-from app.types.audio import AudioInput
 from app.exceptions import InvalidAudioError, UnsupportedFormatError
+from app.types.audio import AudioInput
 
 
 class AudioProcessor:

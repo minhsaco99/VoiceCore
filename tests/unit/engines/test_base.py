@@ -3,12 +3,12 @@ from collections.abc import AsyncIterator
 import pytest
 
 from app.engines.base import BaseSTTEngine, BaseTTSEngine
+from app.exceptions import EngineNotReadyError
 from app.models.engine import EngineConfig, STTChunk, STTResponse, TTSChunk, TTSResponse
 from app.models.metrics import (
     STTPerformanceMetrics,
     TTSPerformanceMetrics,
 )
-from app.exceptions import EngineNotReadyError
 
 
 # Create concrete test implementations

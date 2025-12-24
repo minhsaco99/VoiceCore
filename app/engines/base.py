@@ -13,8 +13,8 @@ Key design principles:
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
-from app.models.engine import EngineConfig, STTChunk, STTResponse, TTSChunk, TTSResponse
 from app.exceptions import EngineNotReadyError
+from app.models.engine import EngineConfig, STTChunk, STTResponse, TTSChunk, TTSResponse
 
 
 class BaseEngine(ABC):

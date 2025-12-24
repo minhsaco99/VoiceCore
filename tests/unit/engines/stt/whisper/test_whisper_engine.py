@@ -2,22 +2,21 @@
 
 import io
 import pathlib
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from app.models.engine import EngineConfig, Segment, STTResponse
-from app.models.metrics import STTPerformanceMetrics
 from app.exceptions import (
     AudioError,
     EngineNotReadyError,
     InvalidAudioError,
     TranscriptionError,
-    TranscriptionTimeoutError,
     UnsupportedFormatError,
 )
+from app.models.engine import EngineConfig, Segment, STTResponse
+from app.models.metrics import STTPerformanceMetrics
 
 
 class TestWhisperConfig:
@@ -462,7 +461,7 @@ class TestWhisperSTTEngineTranscription:
                 {"language": "es"},
             )
 
-            result = await engine.transcribe(np.array([0.1, 0.2]), language="es")
+            await engine.transcribe(np.array([0.1, 0.2]), language="es")
 
             # Verify language was passed
             call_args = mock_instance.transcribe.call_args

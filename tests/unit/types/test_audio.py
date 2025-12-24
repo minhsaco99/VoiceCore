@@ -4,7 +4,6 @@ import io
 import pathlib
 
 import numpy as np
-import pytest
 
 
 class TestAudioInputTypeAlias:
@@ -19,7 +18,7 @@ class TestAudioInputTypeAlias:
 
     def test_audio_input_runtime_type_check(self):
         """Runtime helper should validate AudioInput types correctly"""
-        from app.types.audio import AudioInput, is_valid_audio_input
+        from app.types.audio import is_valid_audio_input
 
         # Valid types
         assert is_valid_audio_input(b"fake audio data")

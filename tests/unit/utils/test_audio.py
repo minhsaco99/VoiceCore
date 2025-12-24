@@ -2,7 +2,7 @@
 
 import io
 import pathlib
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -168,7 +168,7 @@ class TestAudioProcessorResample:
             mock_to_mono.return_value = fake_mono
             mock_resample.return_value = np.random.randn(16000).astype(np.float32)
 
-            resampled = processor.resample_to_16khz(fake_stereo, 44100)
+            processor.resample_to_16khz(fake_stereo, 44100)
 
             # Should have called to_mono first
             mock_to_mono.assert_called_once()
