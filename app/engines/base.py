@@ -14,7 +14,14 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
 from app.exceptions import EngineNotReadyError
-from app.models.engine import EngineConfig, STTChunk, STTResponse, TTSChunk, TTSResponse
+from app.models.engine import (
+    EngineConfig,
+    STTChunk,
+    STTResponse,
+    TTSChunk,
+    TTSResponse,
+)
+from app.types.audio import AudioInput
 
 
 class BaseEngine(ABC):
@@ -144,17 +151,23 @@ class BaseSTTEngine(BaseEngine):
 
     @abstractmethod
     async def transcribe_stream(
-        self, audio_stream: AsyncIterator[bytes], **kwargs
-    ) -> AsyncIterator[STTChunk]:
+        self, audio_data: AudioInput, language: str | None = None, **kwargs
+    ) -> AsyncIterator[STTChunk | STTResponse]:
         """
-        Transcribe audio stream (streaming mode)
+        Transcribe audio in streaming mode (progressive results)
+
+        Processes audio and yields progressive transcription chunks,
+        followed by a final STTResponse with complete results and metrics.
 
         Args:
-            audio_stream: Async iterator of audio chunks
+            audio_data: Audio input (bytes, numpy array, file path, or BytesIO)
+            language: Optional language code (e.g., 'en', 'es')
             **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Yields:
-            STTChunk with partial/final text (STTStreamSummary at end)
+            STTChunk: Partial transcription chunks (per segment, is_final=False)
+            STTChunk: Final marker chunk (is_final=True)
+            STTResponse: Final response with complete text, segments, and metrics
         """
         pass
 
@@ -199,16 +212,23 @@ class BaseTTSEngine(BaseEngine):
         pass
 
     @abstractmethod
-    async def synthesize_stream(self, text: str, **kwargs) -> AsyncIterator[TTSChunk]:
+    async def synthesize_stream(
+        self, text: str, **kwargs
+    ) -> AsyncIterator[TTSChunk | TTSResponse]:
         """
         Synthesize text to speech (streaming mode)
+
+        Generates audio chunks progressively, followed by a final TTSResponse
+        with complete metadata and metrics.
 
         Args:
             text: Text to synthesize
             **kwargs: Engine-specific params (voice, speed, etc.)
 
         Yields:
-            TTSChunk with audio chunks (TTSStreamSummary at end)
+            TTSChunk: Audio chunks with progressive generation
+            TTSChunk: Final marker chunk (is_final=True)
+            TTSResponse: Final response with complete audio metadata and metrics
         """
         pass
 

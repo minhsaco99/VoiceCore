@@ -1255,16 +1255,6 @@ class TestWhisperSTTEngineCoverageGaps:
             assert result.segments[0].text == "Hello"
             assert result.segments[0].confidence == 0.95
 
-    def test_transcribe_stream_not_implemented(self, whisper_config):
-        """Should have transcribe_stream method that will raise NotImplementedError"""
-        from app.engines.stt.whisper.engine import WhisperSTTEngine
-
-        engine = WhisperSTTEngine(whisper_config)
-
-        # Verify the method exists and is documented as not implemented
-        assert hasattr(engine, "transcribe_stream")
-        assert "NOT IMPLEMENTED" in engine.transcribe_stream.__doc__
-
     @pytest.mark.asyncio
     async def test_model_none_after_failed_init(self, whisper_config):
         """Should raise EngineNotReadyError if _model is None"""
@@ -1278,3 +1268,911 @@ class TestWhisperSTTEngineCoverageGaps:
 
         with pytest.raises(EngineNotReadyError, match="Whisper model not loaded"):
             await engine.transcribe(np.array([0.1, 0.2]))
+
+    def test_language_detection_from_object(self, whisper_config):
+        """Should extract language from object-type info"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
+            mock_resample.return_value = np.array([0.1, 0.2])
+            mock_duration.return_value = 1000.0
+
+            # Mock segment
+            mock_segment = MagicMock()
+            mock_segment.text = "Hello"
+
+            # Mock info as object with language attribute (not dict)
+            mock_info = MagicMock()
+            mock_info.language = "fr"
+
+            mock_model.transcribe.return_value = ([mock_segment], mock_info)
+            engine._initialized = True
+
+            import asyncio
+
+            result = asyncio.run(engine.transcribe(np.array([0.1, 0.2])))
+
+            assert result.language == "fr"
+
+    def test_dict_segment_handling(self, whisper_config):
+        """Should handle dict-type segments in transcription"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
+            mock_resample.return_value = np.array([0.1, 0.2])
+            mock_duration.return_value = 1000.0
+
+            # Use dict-type segments instead of objects
+            mock_segment = {"text": "Hello world"}
+            mock_info = {"language": "en"}
+
+            mock_model.transcribe.return_value = ([mock_segment], mock_info)
+            engine._initialized = True
+
+            import asyncio
+
+            result = asyncio.run(engine.transcribe(np.array([0.1, 0.2])))
+
+            assert result.text == "Hello world"
+            assert result.language == "en"
+
+
+class TestWhisperSTTEngineStreaming:
+    """Test WhisperSTTEngine streaming transcription"""
+
+    @pytest.fixture
+    def whisper_config(self):
+        """Fixture for WhisperConfig"""
+        from app.engines.stt.whisper.config import WhisperConfig
+
+        return WhisperConfig(model_name="base", device="cpu")
+
+    # 2.1 Basic Streaming Tests
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_basic(self, whisper_config):
+        """Should yield multiple STTChunk objects and final STTResponse"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+        from app.models.engine import STTChunk, STTResponse
+
+        # Create audio data (bytes)
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            # Setup mocks
+            mock_to_numpy.return_value = (np.array([0.1, 0.2, 0.3]), 16000)
+            mock_resample.return_value = np.array([0.1, 0.2, 0.3])
+            mock_duration.return_value = 1000.0  # 1 second
+
+            # Mock Whisper transcribe to return segments (as generator)
+            mock_segment = MagicMock()
+            mock_segment.text = "test chunk"
+            mock_segment.start = 0.0
+            mock_word = MagicMock(word="test", start=0.0, end=0.5, probability=0.95)
+            mock_segment.words = [mock_word]
+            mock_model.transcribe.return_value = (
+                iter([mock_segment]),
+                {"language": "en"},
+            )
+
+            engine._initialized = True
+
+            results = []
+            async for result in engine.transcribe_stream(audio_data):
+                results.append(result)
+
+            # Should have chunks + final response
+            chunks = [r for r in results if isinstance(r, STTChunk)]
+            responses = [r for r in results if isinstance(r, STTResponse)]
+
+            assert len(chunks) > 0, "Should yield at least one STTChunk"
+            assert len(responses) == 1, "Should yield exactly one STTResponse"
+
+            # Check response
+            response = responses[0]
+            assert response.text != ""
+            assert response.language is not None
+            assert response.segments is not None
+            assert response.performance_metrics is not None
+            assert response.performance_metrics.total_chunks >= 0
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_is_final_flag(self, whisper_config):
+        """Should set is_final=False for intermediate chunks, is_final=True for last"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+        from app.models.engine import STTChunk
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
+            mock_resample.return_value = np.array([0.1, 0.2])
+            mock_duration.return_value = 1000.0
+
+            # Multiple segments
+            mock_segment1 = MagicMock()
+            mock_segment1.text = "text1"
+            mock_segment1.start = 0.0
+            mock_segment2 = MagicMock()
+            mock_segment2.text = "text2"
+            mock_segment2.start = 0.5
+            mock_model.transcribe.return_value = (
+                iter([mock_segment1, mock_segment2]),
+                {},
+            )
+
+            engine._initialized = True
+
+            chunks = []
+            async for result in engine.transcribe_stream(audio_data):
+                if isinstance(result, STTChunk):
+                    chunks.append(result)
+
+            # At least one chunk should have is_final=False
+            # Last chunk should have is_final=True
+            assert len(chunks) >= 2
+            assert any(not c.is_final for c in chunks[:-1])
+            assert chunks[-1].is_final
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_empty_audio(self, whisper_config):
+        """Should handle empty audio gracefully"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([])
+
+        engine = WhisperSTTEngine(whisper_config)
+        engine._initialized = True
+
+        with (
+            patch.object(engine, "_model") as _,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+        ):
+            mock_to_numpy.return_value = (np.array([]), 16000)
+
+            with pytest.raises(InvalidAudioError):
+                async for _ in engine.transcribe_stream(audio_data):
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_single_segment(self, whisper_config):
+        """Should handle single segment correctly"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+        from app.models.engine import STTChunk, STTResponse
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            mock_segment = MagicMock()
+            mock_segment.text = "single"
+            mock_segment.start = 0.0
+            mock_word = MagicMock(word="single", start=0.0, end=0.5, probability=0.95)
+            mock_segment.words = [mock_word]
+            mock_model.transcribe.return_value = (
+                iter([mock_segment]),
+                {"language": "en"},
+            )
+
+            engine._initialized = True
+
+            results = []
+            async for result in engine.transcribe_stream(audio_data):
+                results.append(result)
+
+            chunks = [r for r in results if isinstance(r, STTChunk)]
+            responses = [r for r in results if isinstance(r, STTResponse)]
+
+            assert len(chunks) >= 1
+            assert len(responses) == 1
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_auto_initialization(self, whisper_config):
+        """Engine should auto-initialize when not already initialized"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        # Engine not initialized
+        assert not engine.is_ready()
+
+        with (
+            patch("app.engines.stt.whisper.engine.WhisperModel") as mock_model_class,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            mock_model_instance = MagicMock()
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_model_instance.transcribe.return_value = (iter([mock_segment]), {})
+            mock_model_class.return_value = mock_model_instance
+
+            results = []
+            async for result in engine.transcribe_stream(audio_data):
+                results.append(result)
+
+            # Should have initialized
+            assert engine.is_ready()
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_engine_closed(self, whisper_config):
+        """Should raise EngineNotReadyError if engine closed"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 1000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with patch("app.engines.stt.whisper.engine.WhisperModel"):
+            await engine.initialize()
+            await engine.close()
+
+            with pytest.raises(EngineNotReadyError, match="Engine has been closed"):
+                async for _ in engine.transcribe_stream(audio_data):
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_kwargs_override(self, whisper_config):
+        """Should override config with kwargs parameters"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            mock_model.transcribe.return_value = (iter([]), {})
+            engine._initialized = True
+
+            async for _ in engine.transcribe_stream(
+                audio_data, vad_filter=False, beam_size=3
+            ):
+                pass
+
+            # Verify transcribe was called with overridden params
+            call_kwargs = mock_model.transcribe.call_args[1]
+            assert call_kwargs["vad_filter"] is False
+            assert call_kwargs["beam_size"] == 3
+
+    # 2.2 Metrics and Timing Tests
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_chunk_latency(self, whisper_config):
+        """Should track chunk_latency_ms for each chunk"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+        from app.models.engine import STTChunk
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_model.transcribe.return_value = (iter([mock_segment]), {})
+
+            engine._initialized = True
+
+            chunks = []
+            async for result in engine.transcribe_stream(audio_data):
+                if isinstance(result, STTChunk):
+                    chunks.append(result)
+
+            # All chunks should have chunk_latency_ms
+            for chunk in chunks:
+                assert chunk.chunk_latency_ms is not None
+                assert chunk.chunk_latency_ms >= 0
+                assert chunk.chunk_latency_ms < 10000  # Reasonable upper bound
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_time_to_first_token(self, whisper_config):
+        """Should measure time_to_first_token_ms in response"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+        from app.models.engine import STTResponse
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_word = MagicMock(word="test", start=0.0, end=0.5, probability=0.95)
+            mock_segment.words = [mock_word]
+            mock_model.transcribe.return_value = (
+                iter([mock_segment]),
+                {"language": "en"},
+            )
+
+            engine._initialized = True
+
+            response = None
+            async for result in engine.transcribe_stream(audio_data):
+                if isinstance(result, STTResponse):
+                    response = result
+
+            assert response is not None
+            assert response.performance_metrics is not None
+            assert response.performance_metrics.time_to_first_token_ms is not None
+            assert response.performance_metrics.time_to_first_token_ms >= 0
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_total_duration(self, whisper_config):
+        """Should measure total_stream_duration_ms spanning entire stream"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+        from app.models.engine import STTResponse
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_word = MagicMock(word="test", start=0.0, end=0.5, probability=0.95)
+            mock_segment.words = [mock_word]
+            mock_model.transcribe.return_value = (
+                iter([mock_segment]),
+                {"language": "en"},
+            )
+
+            engine._initialized = True
+
+            response = None
+            async for result in engine.transcribe_stream(audio_data):
+                if isinstance(result, STTResponse):
+                    response = result
+
+            assert response is not None
+            assert response.performance_metrics is not None
+            assert response.performance_metrics.total_stream_duration_ms is not None
+            assert response.performance_metrics.total_stream_duration_ms > 0
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_audio_duration(self, whisper_config):
+        """Should calculate audio_duration_ms in performance metrics"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+        from app.models.engine import STTResponse
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0  # 1 second
+
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_word = MagicMock(word="test", start=0.0, end=0.5, probability=0.95)
+            mock_segment.words = [mock_word]
+            mock_model.transcribe.return_value = (
+                iter([mock_segment]),
+                {"language": "en"},
+            )
+
+            engine._initialized = True
+
+            response = None
+            async for result in engine.transcribe_stream(audio_data):
+                if isinstance(result, STTResponse):
+                    response = result
+
+            assert response is not None
+            assert response.performance_metrics is not None
+            assert response.performance_metrics.audio_duration_ms is not None
+            assert response.performance_metrics.audio_duration_ms >= 0
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_total_chunks_count(self, whisper_config):
+        """Should count total_chunks correctly"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+        from app.models.engine import STTChunk, STTResponse
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            # Create multiple segments
+            mock_segment1 = MagicMock()
+            mock_segment1.text = "test1"
+            mock_segment1.start = 0.0
+            mock_word1 = MagicMock(word="test1", start=0.0, end=0.3, probability=0.95)
+            mock_segment1.words = [mock_word1]
+            mock_segment2 = MagicMock()
+            mock_segment2.text = "test2"
+            mock_segment2.start = 0.5
+            mock_word2 = MagicMock(word="test2", start=0.5, end=0.8, probability=0.95)
+            mock_segment2.words = [mock_word2]
+            mock_segment3 = MagicMock()
+            mock_segment3.text = "test3"
+            mock_segment3.start = 1.0
+            mock_word3 = MagicMock(word="test3", start=1.0, end=1.3, probability=0.95)
+            mock_segment3.words = [mock_word3]
+            mock_model.transcribe.return_value = (
+                iter([mock_segment1, mock_segment2, mock_segment3]),
+                {"language": "en"},
+            )
+
+            engine._initialized = True
+
+            chunks_count = 0
+            response = None
+            async for result in engine.transcribe_stream(audio_data):
+                if isinstance(result, STTChunk):
+                    chunks_count += 1
+                elif isinstance(result, STTResponse):
+                    response = result
+
+            assert response is not None
+            assert response.performance_metrics is not None
+            assert response.performance_metrics.total_chunks == chunks_count
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_timestamps(self, whisper_config):
+        """Should have timestamps that progress monotonically"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+        from app.models.engine import STTChunk
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            # Create segments with increasing timestamps
+            mock_segment1 = MagicMock()
+            mock_segment1.text = "test1"
+            mock_segment1.start = 0.0
+            mock_segment2 = MagicMock()
+            mock_segment2.text = "test2"
+            mock_segment2.start = 0.5
+            mock_model.transcribe.return_value = (
+                iter([mock_segment1, mock_segment2]),
+                {},
+            )
+
+            engine._initialized = True
+
+            chunks = []
+            async for result in engine.transcribe_stream(audio_data):
+                if isinstance(result, STTChunk):
+                    chunks.append(result)
+
+            # Timestamps should exist and be non-decreasing
+            timestamps = [c.timestamp for c in chunks if c.timestamp is not None]
+            if len(timestamps) > 1:
+                for i in range(1, len(timestamps)):
+                    assert timestamps[i] >= timestamps[i - 1]
+
+    # 2.3 Audio Input Format Tests
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_with_language_parameter(self, whisper_config):
+        """Should accept and use language parameter"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            mock_model.transcribe.return_value = (iter([]), {})
+            engine._initialized = True
+
+            async for _ in engine.transcribe_stream(audio_data, language="en"):
+                pass
+
+            # Verify language was passed
+            call_kwargs = mock_model.transcribe.call_args[1]
+            assert call_kwargs["language"] == "en"
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_numpy_input(self, whisper_config):
+        """Should accept numpy array as input"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = np.array([0.1, 0.2, 0.3], dtype=np.float32)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (audio_data, 16000)
+            mock_resample.return_value = audio_data
+            mock_duration.return_value = 1000.0
+
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_model.transcribe.return_value = (iter([mock_segment]), {})
+            engine._initialized = True
+
+            results = []
+            async for result in engine.transcribe_stream(audio_data):
+                results.append(result)
+
+            assert len(results) > 0
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_path_input(self, whisper_config):
+        """Should accept Path as input"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = pathlib.Path("/fake/audio.wav")
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
+            mock_resample.return_value = np.array([0.1, 0.2])
+            mock_duration.return_value = 1000.0
+
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_model.transcribe.return_value = (iter([mock_segment]), {})
+            engine._initialized = True
+
+            results = []
+            async for result in engine.transcribe_stream(audio_data):
+                results.append(result)
+
+            assert len(results) > 0
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_bytesio_input(self, whisper_config):
+        """Should accept BytesIO as input"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = io.BytesIO(b"fake audio data")
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
+            mock_resample.return_value = np.array([0.1, 0.2])
+            mock_duration.return_value = 1000.0
+
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_model.transcribe.return_value = (iter([mock_segment]), {})
+            engine._initialized = True
+
+            results = []
+            async for result in engine.transcribe_stream(audio_data):
+                results.append(result)
+
+            assert len(results) > 0
+
+    # 2.4 Error Handling Tests
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_whisper_model_error(self, whisper_config):
+        """Should propagate Whisper errors as TranscriptionError"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            # Whisper raises exception
+            mock_model.transcribe.side_effect = RuntimeError("Whisper internal error")
+
+            engine._initialized = True
+
+            with pytest.raises(TranscriptionError, match="Stream transcription failed"):
+                async for _ in engine.transcribe_stream(audio_data):
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_invalid_language(self, whisper_config):
+        """Should handle invalid language parameter"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            # Whisper rejects invalid language
+            mock_model.transcribe.side_effect = ValueError("Invalid language code")
+
+            engine._initialized = True
+
+            with pytest.raises(TranscriptionError):
+                async for _ in engine.transcribe_stream(
+                    audio_data, language="invalid_lang"
+                ):
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_audio_processor_error(self, whisper_config):
+        """Should handle AudioProcessor errors appropriately"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as _,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+        ):
+            # AudioProcessor fails
+            mock_to_numpy.side_effect = InvalidAudioError("Failed to decode audio")
+
+            engine._initialized = True
+
+            with pytest.raises(InvalidAudioError):
+                async for _ in engine.transcribe_stream(audio_data):
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_model_none(self, whisper_config):
+        """Should raise EngineNotReadyError if _model is None in streaming"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+        engine._initialized = True  # Bypass auto-init
+        engine._model = None
+
+        with pytest.raises(EngineNotReadyError, match="Whisper model not loaded"):
+            async for _ in engine.transcribe_stream(audio_data):
+                pass
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_dict_segments(self, whisper_config):
+        """Should handle dict-type segments in streaming"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            # Use dict-type segments instead of objects
+            mock_segment = {"text": "dict segment", "start": 0.0}
+            mock_model.transcribe.return_value = (iter([mock_segment]), {})
+
+            engine._initialized = True
+
+            results = []
+            async for result in engine.transcribe_stream(audio_data):
+                results.append(result)
+
+            assert len(results) > 0
+
+    # 2.5 VAD Tests
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_vad_enabled(self, whisper_config):
+        """Should use VAD when vad_filter=True"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_model.transcribe.return_value = (iter([mock_segment]), {})
+
+            engine._initialized = True
+
+            async for _ in engine.transcribe_stream(audio_data, vad_filter=True):
+                pass
+
+            # Verify vad_filter was set
+            call_kwargs = mock_model.transcribe.call_args[1]
+            assert call_kwargs["vad_filter"] is True
+
+    @pytest.mark.asyncio
+    async def test_transcribe_stream_vad_disabled(self, whisper_config):
+        """Should process without VAD when vad_filter=False"""
+        from app.engines.stt.whisper.engine import WhisperSTTEngine
+
+        audio_data = bytes([0] * 32000)
+
+        engine = WhisperSTTEngine(whisper_config)
+
+        with (
+            patch.object(engine, "_model") as mock_model,
+            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
+            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
+            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
+        ):
+            mock_to_numpy.return_value = (np.array([0.1]), 16000)
+            mock_resample.return_value = np.array([0.1])
+            mock_duration.return_value = 1000.0
+
+            mock_segment = MagicMock()
+            mock_segment.text = "test"
+            mock_segment.start = 0.0
+            mock_model.transcribe.return_value = (iter([mock_segment]), {})
+
+            engine._initialized = True
+
+            async for _ in engine.transcribe_stream(audio_data, vad_filter=False):
+                pass
+
+            # Verify vad_filter=False was passed
+            call_kwargs = mock_model.transcribe.call_args[1]
+            assert call_kwargs["vad_filter"] is False
