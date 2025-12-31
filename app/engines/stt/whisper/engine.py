@@ -213,8 +213,7 @@ class WhisperSTTEngine(BaseSTTEngine):
                      Examples: vad_filter, beam_size, temperature
 
         Yields:
-            STTChunk: Partial transcription chunks (one per segment, is_final=False)
-            STTChunk: Final marker chunk (is_final=True)
+            STTChunk: Partial transcription chunks (one per segment)
             STTResponse: Final response with complete text, segments, language, and metrics
 
         Raises:
@@ -302,24 +301,13 @@ class WhisperSTTEngine(BaseSTTEngine):
                 # Calculate chunk latency
                 chunk_latency_ms = (time.time() - chunk_start_time) * 1000
 
-                # Yield STTChunk (not final)
+                # Yield STTChunk
                 yield STTChunk(
                     text=text,
-                    is_final=False,
                     timestamp=timestamp,
                     confidence=None,
                     chunk_latency_ms=chunk_latency_ms,
                 )
-
-            # Always yield final marker chunk (per user decision)
-            yield STTChunk(
-                text=accumulated_text[-1] if accumulated_text else "",
-                is_final=True,
-                timestamp=None,
-                confidence=None,
-                chunk_latency_ms=0.0,
-            )
-            total_chunks += 1  # Count final marker
 
             # Calculate final metrics
             end_time = time.time()

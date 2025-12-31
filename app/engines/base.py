@@ -165,8 +165,7 @@ class BaseSTTEngine(BaseEngine):
             **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Yields:
-            STTChunk: Partial transcription chunks (per segment, is_final=False)
-            STTChunk: Final marker chunk (is_final=True)
+            STTChunk: Partial transcription chunks (progressive results)
             STTResponse: Final response with complete text, segments, and metrics
         """
         pass
@@ -227,7 +226,6 @@ class BaseTTSEngine(BaseEngine):
 
         Yields:
             TTSChunk: Audio chunks with progressive generation
-            TTSChunk: Final marker chunk (is_final=True)
             TTSResponse: Final response with complete audio metadata and metrics
         """
         pass

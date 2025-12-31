@@ -286,7 +286,6 @@ class TestSTTChunk:
         chunk = STTChunk(text="Hello")
 
         assert chunk.text == "Hello"
-        assert chunk.is_final is False  # Default
         assert chunk.timestamp is None
         assert chunk.confidence is None
         assert chunk.chunk_latency_ms is None
@@ -301,20 +300,19 @@ class TestSTTChunk:
         assert chunk.text == "Hello"
         assert chunk.chunk_latency_ms == 45.0
 
-    def test_create_stt_chunk_final(self):
-        """Should create final STTChunk"""
+    def test_create_stt_chunk_with_all_fields(self):
+        """Should create STTChunk with all fields"""
         chunk = STTChunk(
             text="Hello world",
-            is_final=True,
             timestamp=2.5,
             confidence=0.95,
             chunk_latency_ms=50.0,
         )
 
         assert chunk.text == "Hello world"
-        assert chunk.is_final is True
         assert chunk.timestamp == 2.5
         assert chunk.confidence == 0.95
+        assert chunk.chunk_latency_ms == 50.0
 
 
 class TestTTSChunk:
@@ -329,7 +327,6 @@ class TestTTSChunk:
 
         assert chunk.audio_data == b"audio chunk"
         assert chunk.sequence_number == 0
-        assert chunk.is_final is False
         assert chunk.chunk_latency_ms is None
 
     def test_create_tts_chunk_with_latency(self):
@@ -342,18 +339,17 @@ class TestTTSChunk:
 
         assert chunk.chunk_latency_ms == 30.0
 
-    def test_create_tts_chunk_final(self):
-        """Should create final TTSChunk"""
+    def test_create_tts_chunk_with_all_fields(self):
+        """Should create TTSChunk with all fields"""
         chunk = TTSChunk(
             audio_data=b"last chunk",
             sequence_number=10,
-            is_final=True,
             chunk_latency_ms=35.0,
         )
 
         assert chunk.audio_data == b"last chunk"
-        assert chunk.is_final is True
         assert chunk.sequence_number == 10
+        assert chunk.chunk_latency_ms == 35.0
 
 
 class TestSTTPerformanceMetricsStreaming:

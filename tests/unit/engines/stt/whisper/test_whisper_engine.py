@@ -1400,51 +1400,6 @@ class TestWhisperSTTEngineStreaming:
             assert response.performance_metrics.total_chunks >= 0
 
     @pytest.mark.asyncio
-    async def test_transcribe_stream_is_final_flag(self, whisper_config):
-        """Should set is_final=False for intermediate chunks, is_final=True for last"""
-        from app.engines.stt.whisper.engine import WhisperSTTEngine
-        from app.models.engine import STTChunk
-
-        audio_data = bytes([0] * 32000)
-
-        engine = WhisperSTTEngine(whisper_config)
-
-        with (
-            patch.object(engine, "_model") as mock_model,
-            patch.object(engine._audio_processor, "to_numpy") as mock_to_numpy,
-            patch.object(engine._audio_processor, "resample_to_16khz") as mock_resample,
-            patch.object(engine._audio_processor, "get_duration_ms") as mock_duration,
-        ):
-            mock_to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
-            mock_resample.return_value = np.array([0.1, 0.2])
-            mock_duration.return_value = 1000.0
-
-            # Multiple segments
-            mock_segment1 = MagicMock()
-            mock_segment1.text = "text1"
-            mock_segment1.start = 0.0
-            mock_segment2 = MagicMock()
-            mock_segment2.text = "text2"
-            mock_segment2.start = 0.5
-            mock_model.transcribe.return_value = (
-                iter([mock_segment1, mock_segment2]),
-                {},
-            )
-
-            engine._initialized = True
-
-            chunks = []
-            async for result in engine.transcribe_stream(audio_data):
-                if isinstance(result, STTChunk):
-                    chunks.append(result)
-
-            # At least one chunk should have is_final=False
-            # Last chunk should have is_final=True
-            assert len(chunks) >= 2
-            assert any(not c.is_final for c in chunks[:-1])
-            assert chunks[-1].is_final
-
-    @pytest.mark.asyncio
     async def test_transcribe_stream_empty_audio(self, whisper_config):
         """Should handle empty audio gracefully"""
         from app.engines.stt.whisper.engine import WhisperSTTEngine

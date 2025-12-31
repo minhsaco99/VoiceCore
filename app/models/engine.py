@@ -113,11 +113,11 @@ class STTChunk(BaseModel):
     """
     Streaming chunk from STT
 
-    Lightweight model for real-time streaming - heavy metrics in STTStreamSummary
+    Lightweight model for real-time streaming - represents partial transcription results.
+    Stream ends when STTResponse is received instead of STTChunk.
     """
 
-    text: str = Field(..., description="Partial or final transcription text")
-    is_final: bool = Field(default=False, description="Is this the final chunk?")
+    text: str = Field(..., description="Partial transcription text")
     timestamp: float | None = Field(
         None, description="Timestamp position in audio (seconds)"
     )
@@ -135,11 +135,11 @@ class TTSChunk(BaseModel):
     """
     Streaming chunk from TTS
 
-    Lightweight model for real-time audio streaming
+    Lightweight model for real-time audio streaming - represents partial audio generation.
+    Stream ends when TTSResponse is received instead of TTSChunk.
     """
 
     audio_data: bytes = Field(..., description="Audio chunk bytes")
-    is_final: bool = Field(default=False, description="Is this the final chunk?")
     sequence_number: int = Field(..., ge=0, description="Chunk sequence for ordering")
 
     # Per-chunk timing only
