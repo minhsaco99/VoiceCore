@@ -15,6 +15,8 @@ help:
 	@echo "  make install       - Install all dependencies"
 	@echo "  make dev           - Install dev dependencies"
 	@echo "  make run           - Run the application"
+	@echo "  make dev-api       - Run FastAPI dev server with auto-reload"
+	@echo "  make run-api       - Run FastAPI production server"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make lint          - Run linting (ruff)"
@@ -79,6 +81,14 @@ check: lint format-check
 # Run application
 run:
 	@echo "Starting application..."
+	uv run python main.py
+
+dev-api:
+	@echo "Starting FastAPI dev server..."
+	uv run uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
+
+run-api:
+	@echo "Starting FastAPI production server..."
 	uv run python main.py
 
 # Cleanup

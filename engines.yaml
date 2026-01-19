@@ -1,0 +1,29 @@
+# Engine Configuration
+# Define which STT/TTS engines to load at startup
+
+stt:
+  whisper:
+    enabled: true
+    engine_class: "app.engines.stt.whisper.engine.WhisperSTTEngine"
+    config:
+      model_name: "base"
+      device: "cpu"
+      compute_type: "int8"
+      timeout_seconds: 300
+
+  # Example: Google STT (disabled by default)
+  # google:
+  #   enabled: false
+  #   engine_class: "app.engines.stt.google.engine.GoogleSTTEngine"
+  #   config:
+  #     api_key: "${GOOGLE_API_KEY}"  # Read from env var
+  #     language: "en-US"
+
+tts: {}
+  # Example: Coqui TTS (disabled)
+  # coqui:
+  #   enabled: false
+  #   engine_class: "app.engines.tts.coqui.engine.CoquiTTSEngine"
+  #   config:
+  #     model_name: "tts_models/en/ljspeech/tacotron2-DDC"
+  #     device: "cpu"

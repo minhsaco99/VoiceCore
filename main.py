@@ -1,6 +1,13 @@
-def main():
-    print("Hello from voice-engine-api!")
+import uvicorn
 
+from app.api.config import Settings
 
 if __name__ == "__main__":
-    main()
+    settings = Settings()
+    uvicorn.run(
+        "app.api.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
+        loop="asyncio",  # Async-optimized
+    )
