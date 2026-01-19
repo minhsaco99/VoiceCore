@@ -1606,13 +1606,15 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "faster-whisper" },
     { name = "httpx" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+]
+whisper = [
+    { name = "faster-whisper" },
 ]
 
 [package.metadata]
@@ -1631,7 +1633,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "faster-whisper", specifier = ">=1.2.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=9.0.2" },
@@ -1639,6 +1640,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "ruff", specifier = ">=0.14.10" },
 ]
+whisper = [{ name = "faster-whisper", specifier = ">=1.2.1" }]
 
 [[package]]
 name = "watchfiles"
