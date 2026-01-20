@@ -30,7 +30,7 @@ It abstracts away the complexities of model management, threading, and resource 
 
 ## 🏗️ Architecture
 
-![Architecture Diagram](docs/architecture.svg)
+![Architecture Diagram](figures/architecture.svg)
 
 ---
 
