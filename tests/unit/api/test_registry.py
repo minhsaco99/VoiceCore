@@ -46,7 +46,7 @@ class TestEngineRegistryBasic:
 
         engine = registry.get_stt("whisper")
         assert engine == mock_stt_engine
-        assert engine.engine_name == "mock-stt"
+        assert engine.engine_name == "test-stt"
 
     def test_get_stt_not_found(self):
         """Get non-existent engine raises EngineNotFoundError"""

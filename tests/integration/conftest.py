@@ -1,4 +1,8 @@
-"""Shared fixtures for integration tests"""
+"""Shared fixtures for integration tests
+
+Note: Integration tests require faster_whisper to be installed.
+Tests will be skipped if not available.
+"""
 
 from pathlib import Path
 
