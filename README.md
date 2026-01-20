@@ -1,203 +1,157 @@
-# Voice Engine API
+# 🎙️ Voice Engine API
 
-A modular, async-native FastAPI framework for Speech-to-Text (STT) and Text-to-Speech (TTS) engines.
+> **A production-ready, async-native FastAPI framework for building high-performance Speech-to-Text (STT) and Text-to-Speech (TTS) applications.**
 
-![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)
-![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=for-the-badge&logo=apache&logoColor=white)](LICENSE)
+[![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg?style=for-the-badge)](https://github.com/astral-sh/ruff)
 
-## Features
+---
 
-- **Multi-engine architecture** - Plugin pattern for swappable STT/TTS engines
-- **Multiple API modes** - REST, SSE streaming, and WebSocket real-time
-- **YAML-based configuration** - Declarative engine setup via `engines.yaml`
-- **Async-native** - Built on FastAPI with proper lifecycle management
-- **Production-ready** - Health checks, readiness probes, and performance metrics
+## ⚡ Overview
 
-## Supported Engines
+Voice Engine API is a modular framework designed to simplify the integration of various speech AI models into a unified, high-performance API. Whether you need batch processing, real-time streaming via Server-Sent Events (SSE), or low-latency WebSocket communication, this project provides the robust foundation you need.
 
-### Speech-to-Text (STT)
+It abstracts away the complexities of model management, threading, and resource allocation, allowing you to focus on building great voice-enabled applications.
 
-| Engine | Status | Description |
-|--------|--------|-------------|
-| Whisper (faster-whisper) | Supported | Local STT via faster-whisper with word-level timestamps |
+### 🌟 Key Features
 
-### Text-to-Speech (TTS)
+| Feature | Description |
+| ------- | ----------- |
+| **🔌 Modular Architecture** | Plugin-based design allowing you to easily swap or add new STT/TTS engines without changing core logic. |
+| **🚀 Async-Native** | Built from the ground up on modern Python `asyncio` and FastAPI for maximum concurrency and throughput. |
+| **🌊 Universal Streaming** | First-class support for both **SSE** (Server-Sent Events) and **WebSockets** for real-time applications. |
+| **⚙️ Declarative Config** | extensive configuration via `engines.yaml` to manage models, compute types, and devices (CPU/GPU). |
+| **🛡️ Production Ready** | Includes health checks, readiness probes, OpenTelemetry-ready metrics hooks, and graceful shutdown. |
+| **🐳 Docker Friendly** | Ready for containerization with environment-variable overrides for flexible deployments. |
 
-| Engine | Status | Description |
-|--------|--------|-------------|
-| (Coming soon) | Planned | - |
+---
 
-### Roadmap
+## 🏗️ Architecture
 
-- [ ] Google Cloud Speech-to-Text
-- [ ] Azure Speech Services
-- [ ] Coqui TTS
-- [ ] OpenAI Whisper API
+![Architecture Diagram](docs/architecture.svg)
 
-## Quick Start
+---
 
-### Installation
+## 🚀 Quick Start
+
+### 1️⃣ Installation
+
+We recommend using **[uv](https://github.com/astral-sh/uv)** for lightning-fast dependency management, but standard `pip` works too.
 
 ```bash
-# Clone and install
-git clone <repository-url>
-cd voice-engine-api
+# Clone the repository
+git clone https://github.com/minhsaco99/VoiceCore.git
+cd VoiceCore
 
-# Install with uv (recommended)
+# Install dependencies with uv
 uv sync
 
-# Install Whisper engine dependencies
+# Install specific engine dependencies (e.g., Whisper)
 uv sync --group whisper
 ```
 
-### Run Server
+### 2️⃣ Configuration
 
-```bash
-# Development mode with auto-reload
-make dev-api
-
-# Or directly with uvicorn
-uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Test It
-
-```bash
-# Health check
-curl http://localhost:8000/api/v1/health
-
-# List available engines
-curl http://localhost:8000/api/v1/engines
-
-# Transcribe audio (batch mode)
-curl -X POST "http://localhost:8000/api/v1/stt/transcribe?engine=whisper" \
-  -F "file=@audio.wav"
-```
-
-## API Overview
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/health` | Health check |
-| GET | `/api/v1/ready` | Readiness check (engine status) |
-| GET | `/api/v1/engines` | List available engines |
-| POST | `/api/v1/stt/transcribe` | Batch transcription |
-| POST | `/api/v1/stt/transcribe/stream` | SSE streaming transcription |
-| WS | `/api/v1/stt/transcribe/ws` | WebSocket real-time transcription |
-
-See [docs/api.md](docs/api.md) for full API documentation.
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Server host |
-| `PORT` | `8000` | Server port |
-| `DEBUG` | `false` | Debug mode |
-| `ENGINE_CONFIG_PATH` | `engines.yaml` | Path to engine config |
-| `MAX_AUDIO_SIZE_MB` | `25` | Max upload size |
-| `CORS_ORIGINS` | `["*"]` | Allowed CORS origins |
-
-### Engine Configuration (engines.yaml)
+Create your engine configuration. The default `engines.yaml` is ready to go with CPU-based Whisper.
 
 ```yaml
+# engines.yaml
 stt:
   whisper:
     enabled: true
     engine_class: "app.engines.stt.whisper.engine.WhisperSTTEngine"
     config:
-      model_name: "base"  # tiny, base, small, medium, large, large-v2, large-v3
-      device: "cpu"       # cpu, cuda, mps
+      model_name: "base"
+      device: "cpu"
       compute_type: "int8"
-
-tts: {}
 ```
 
-See [docs/configuration.md](docs/configuration.md) for full configuration reference.
-
-## Adding Custom Engines
-
-The framework uses a plugin pattern for engines:
-
-1. Create engine directory under `app/engines/stt/` or `app/engines/tts/`
-2. Implement `BaseSTTEngine` or `BaseTTSEngine` interface
-3. Create a config class extending `EngineConfig`
-4. Register in `engines.yaml`
-
-```python
-from app.engines.base import BaseSTTEngine
-from app.models.engine import EngineConfig, STTResponse
-
-class MySTTEngine(BaseSTTEngine):
-    async def _initialize(self) -> None:
-        # Load models/resources
-        pass
-
-    async def _cleanup(self) -> None:
-        # Cleanup resources
-        pass
-
-    async def transcribe(self, audio_data, language=None, **kwargs) -> STTResponse:
-        # Implement transcription
-        pass
-
-    # ... implement remaining abstract methods
-```
-
-See [docs/custom-engines.md](docs/custom-engines.md) for the complete guide.
-
-## Development
+### 3️⃣ Run the Server
 
 ```bash
-# Install with dev dependencies
-make dev
+# Start development server with auto-reload
+make dev-api
 
-# Run all tests
-make test
-
-# Run unit tests only
-make test-unit
-
-# Run tests with coverage
-make test-cov
-
-# Lint code
-make lint
-
-# Format code
-make format
-
-# Run all checks
-make check
+# OR using uvicorn directly
+uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Project Structure
+---
 
-```
-voice-engine-api/
-├── app/
-│   ├── api/              # FastAPI application
-│   │   ├── main.py       # App entry point
-│   │   ├── routers/      # API endpoints
-│   │   ├── middleware/   # CORS, logging, error handling
-│   │   └── deps.py       # Dependencies
-│   ├── engines/          # Engine implementations
-│   │   ├── base.py       # Abstract base classes
-│   │   └── stt/          # STT engines (whisper, etc.)
-│   ├── models/           # Pydantic models
-│   └── types/            # Type definitions
-├── docs/                 # Documentation
-├── tests/
-│   ├── unit/             # Unit tests
-│   └── integration/      # Integration tests
-├── engines.yaml          # Engine configuration
-├── pyproject.toml        # Project dependencies
-└── Makefile              # Development commands
+## 🎮 Usage Examples
+
+### Health Check
+
+```bash
+curl http://localhost:8000/api/v1/health
+# {"status":"healthy", "version":"1.0.0"}
 ```
 
-## License
+### 📝 Speech-to-Text (STT)
 
-Apache 2.0 License
+**Batch Transcription**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/stt/transcribe?engine=whisper" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@/path/to/audio.wav"
+```
+
+**Real-time Streaming (SSE)**
+
+```bash
+curl -N -X POST "http://localhost:8000/api/v1/stt/transcribe/stream?engine=whisper" \
+  -F "file=@/path/to/audio.wav"
+```
+
+---
+
+## 📚 Documentation
+
+Detailed documentation is available in the `docs/` directory:
+
+*   **[📖 API Reference](docs/api.md)**: Full details on all REST, SSE, and WebSocket endpoints.
+*   **[⚙️ Configuration Guide](docs/configuration.md)**: How to configure engines, environment variables, and the `engines.yaml` file.
+*   **[🛠️ Custom Engines](docs/custom-engines.md)**: A step-by-step guide to building and integrating your own STT or TTS engines.
+
+---
+
+## 🧩 Supported Engines
+
+### Speech-to-Text (STT)
+
+| Engine | Backend | Status | Features |
+| :--- | :--- | :---: | :--- |
+| **Whisper** | `faster-whisper` | ✅ Ready | Word-timestamps, VAD, Beam search |
+| **Google STT** | Google Cloud | 🚧 Planned | Cloud-based, massive language support |
+| **Azure STT** | Azure Speech | 🚧 Planned | Enterprise-grade cloud recognition |
+
+### Text-to-Speech (TTS)
+
+| Engine | Backend | Status | Features |
+| :--- | :--- | :---: | :--- |
+| **Coqui TTS** | `TTS` | 🚧 Planned | High-quality open source voices |
+| **OpenAI TTS** | OpenAI API | 🚧 Planned | Natural sounding commercial voices |
+
+---
+
+## 🛠️ Development Commands
+
+This project uses a `Makefile` to simplify common development tasks:
+
+```bash
+make dev        # Install dev dependencies
+make test       # Run all tests
+make lint       # Check code style with Ruff
+make format     # Auto-format code
+make clean      # Clean up build artifacts
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
