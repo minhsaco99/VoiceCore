@@ -3,12 +3,13 @@ from collections.abc import AsyncIterator
 import pytest
 
 from app.engines.base import BaseSTTEngine, BaseTTSEngine
+from app.exceptions import EngineNotReadyError
 from app.models.engine import EngineConfig, STTChunk, STTResponse, TTSChunk, TTSResponse
 from app.models.metrics import (
     STTPerformanceMetrics,
     TTSPerformanceMetrics,
 )
-from app.utils.exceptions import EngineNotReadyError
+from app.types.audio import AudioInput
 
 
 # Create concrete test implementations
@@ -41,12 +42,22 @@ class MockSTTEngine(BaseSTTEngine):
         )
 
     async def transcribe_stream(
-        self, audio_stream: AsyncIterator[bytes]
-    ) -> AsyncIterator[STTChunk]:
+        self, audio_data: AudioInput, language: str | None = None, **kwargs
+    ) -> AsyncIterator[STTChunk | STTResponse]:
+        await self._ensure_ready()
         yield STTChunk(
             text="mock",
-            is_final=True,
             chunk_latency_ms=50.0,
+        )
+        yield STTResponse(
+            text="mock transcription",
+            performance_metrics=STTPerformanceMetrics(
+                latency_ms=100.0,
+                processing_time_ms=95.0,
+                time_to_first_token_ms=50.0,
+                total_stream_duration_ms=100.0,
+                total_chunks=1,
+            ),
         )
 
     @property
@@ -88,12 +99,26 @@ class MockTTSEngine(BaseTTSEngine):
             ),
         )
 
-    async def synthesize_stream(self, text: str, **kwargs) -> AsyncIterator[TTSChunk]:
+    async def synthesize_stream(
+        self, text: str, **kwargs
+    ) -> AsyncIterator[TTSChunk | TTSResponse]:
+        await self._ensure_ready()
         yield TTSChunk(
             audio_data=b"mock",
             sequence_number=0,
-            is_final=True,
             chunk_latency_ms=30.0,
+        )
+        yield TTSResponse(
+            audio_data=b"mock audio",
+            sample_rate=22050,
+            duration_seconds=1.0,
+            performance_metrics=TTSPerformanceMetrics(
+                latency_ms=100.0,
+                processing_time_ms=95.0,
+                time_to_first_byte_ms=30.0,
+                total_stream_duration_ms=100.0,
+                total_chunks=1,
+            ),
         )
 
     @property

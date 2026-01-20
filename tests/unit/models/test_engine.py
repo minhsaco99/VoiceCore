@@ -7,11 +7,9 @@ from app.models.engine import (
     STTChunk,
     STTRequest,
     STTResponse,
-    STTStreamSummary,
     TTSChunk,
     TTSRequest,
     TTSResponse,
-    TTSStreamSummary,
 )
 from app.models.metrics import (
     STTPerformanceMetrics,
@@ -288,7 +286,6 @@ class TestSTTChunk:
         chunk = STTChunk(text="Hello")
 
         assert chunk.text == "Hello"
-        assert chunk.is_final is False  # Default
         assert chunk.timestamp is None
         assert chunk.confidence is None
         assert chunk.chunk_latency_ms is None
@@ -303,20 +300,19 @@ class TestSTTChunk:
         assert chunk.text == "Hello"
         assert chunk.chunk_latency_ms == 45.0
 
-    def test_create_stt_chunk_final(self):
-        """Should create final STTChunk"""
+    def test_create_stt_chunk_with_all_fields(self):
+        """Should create STTChunk with all fields"""
         chunk = STTChunk(
             text="Hello world",
-            is_final=True,
             timestamp=2.5,
             confidence=0.95,
             chunk_latency_ms=50.0,
         )
 
         assert chunk.text == "Hello world"
-        assert chunk.is_final is True
         assert chunk.timestamp == 2.5
         assert chunk.confidence == 0.95
+        assert chunk.chunk_latency_ms == 50.0
 
 
 class TestTTSChunk:
@@ -331,7 +327,6 @@ class TestTTSChunk:
 
         assert chunk.audio_data == b"audio chunk"
         assert chunk.sequence_number == 0
-        assert chunk.is_final is False
         assert chunk.chunk_latency_ms is None
 
     def test_create_tts_chunk_with_latency(self):
@@ -344,77 +339,114 @@ class TestTTSChunk:
 
         assert chunk.chunk_latency_ms == 30.0
 
-    def test_create_tts_chunk_final(self):
-        """Should create final TTSChunk"""
+    def test_create_tts_chunk_with_all_fields(self):
+        """Should create TTSChunk with all fields"""
         chunk = TTSChunk(
             audio_data=b"last chunk",
             sequence_number=10,
-            is_final=True,
             chunk_latency_ms=35.0,
         )
 
         assert chunk.audio_data == b"last chunk"
-        assert chunk.is_final is True
         assert chunk.sequence_number == 10
+        assert chunk.chunk_latency_ms == 35.0
 
 
-class TestSTTStreamSummary:
-    """Test STTStreamSummary model (sent at end of stream)"""
+class TestSTTPerformanceMetricsStreaming:
+    """Test STTPerformanceMetrics with streaming-specific fields"""
 
-    def test_create_stt_stream_summary(self):
-        """Should create STTStreamSummary with aggregate metrics"""
-        summary = STTStreamSummary(
-            total_text="Hello world this is a test",
-            total_chunks=5,
-            audio_duration_seconds=3.5,
-            time_to_first_token_ms=280.0,
-            total_duration_ms=4000.0,
+    def test_create_stt_metrics_with_streaming_fields(self):
+        """Should create STTPerformanceMetrics with streaming fields"""
+        metrics = STTPerformanceMetrics(
+            latency_ms=500.0,
+            processing_time_ms=450.0,
+            audio_duration_ms=3000.0,
+            real_time_factor=0.15,
+            time_to_first_token_ms=250.0,  # Streaming field
+            total_stream_duration_ms=500.0,  # Streaming field
+            total_chunks=5,  # Streaming field
         )
 
-        assert summary.total_text == "Hello world this is a test"
-        assert summary.total_chunks == 5
-        assert summary.audio_duration_seconds == 3.5
-        assert summary.time_to_first_token_ms == 280.0
-        assert summary.total_duration_ms == 4000.0
+        assert metrics.latency_ms == 500.0
+        assert metrics.processing_time_ms == 450.0
+        assert metrics.audio_duration_ms == 3000.0
+        assert metrics.real_time_factor == 0.15
+        assert metrics.time_to_first_token_ms == 250.0
+        assert metrics.total_stream_duration_ms == 500.0
+        assert metrics.total_chunks == 5
 
-    def test_create_stt_stream_summary_minimal(self):
-        """Should create STTStreamSummary with only required fields"""
-        summary = STTStreamSummary(
-            total_text="Hello",
-            total_chunks=1,
+    def test_create_stt_metrics_invoke_mode(self):
+        """Should create STTPerformanceMetrics for invoke mode (streaming fields None)"""
+        metrics = STTPerformanceMetrics(
+            latency_ms=500.0,
+            processing_time_ms=450.0,
+            audio_duration_ms=3000.0,
         )
 
-        assert summary.total_text == "Hello"
-        assert summary.total_chunks == 1
-        assert summary.time_to_first_token_ms is None
+        assert metrics.latency_ms == 500.0
+        assert metrics.processing_time_ms == 450.0
+        # Streaming fields should be None
+        assert metrics.time_to_first_token_ms is None
+        assert metrics.total_stream_duration_ms is None
+        assert metrics.total_chunks is None
 
-
-class TestTTSStreamSummary:
-    """Test TTSStreamSummary model (sent at end of stream)"""
-
-    def test_create_tts_stream_summary(self):
-        """Should create TTSStreamSummary with aggregate metrics"""
-        summary = TTSStreamSummary(
-            total_bytes=48000,
-            total_chunks=10,
-            audio_duration_seconds=3.0,
-            time_to_first_byte_ms=120.0,
-            total_duration_ms=3500.0,
+    def test_stt_response_for_streaming(self):
+        """Should work with STTResponse for streaming mode"""
+        response = STTResponse(
+            text="Hello world",
+            language="en",
+            segments=[
+                Segment(start=0.0, end=0.5, text="Hello", confidence=0.95),
+                Segment(start=0.5, end=1.0, text="world", confidence=0.92),
+            ],
+            performance_metrics=STTPerformanceMetrics(
+                latency_ms=500.0,
+                processing_time_ms=450.0,
+                audio_duration_ms=1000.0,
+                time_to_first_token_ms=250.0,
+                total_stream_duration_ms=500.0,
+                total_chunks=3,
+            ),
         )
 
-        assert summary.total_bytes == 48000
-        assert summary.total_chunks == 10
-        assert summary.audio_duration_seconds == 3.0
-        assert summary.time_to_first_byte_ms == 120.0
-        assert summary.total_duration_ms == 3500.0
+        assert response.text == "Hello world"
+        assert response.language == "en"
+        assert len(response.segments) == 2
+        assert response.performance_metrics.time_to_first_token_ms == 250.0
+        assert response.performance_metrics.total_chunks == 3
 
-    def test_create_tts_stream_summary_minimal(self):
-        """Should create TTSStreamSummary with only required fields"""
-        summary = TTSStreamSummary(
-            total_bytes=4800,
-            total_chunks=1,
+
+class TestTTSPerformanceMetricsStreaming:
+    """Test TTSPerformanceMetrics with streaming-specific fields"""
+
+    def test_create_tts_metrics_with_streaming_fields(self):
+        """Should create TTSPerformanceMetrics with streaming fields"""
+        metrics = TTSPerformanceMetrics(
+            latency_ms=400.0,
+            processing_time_ms=380.0,
+            characters_per_second=50.0,
+            time_to_first_byte_ms=120.0,  # Streaming field
+            total_stream_duration_ms=400.0,  # Streaming field
+            total_chunks=8,  # Streaming field
         )
 
-        assert summary.total_bytes == 4800
-        assert summary.total_chunks == 1
-        assert summary.time_to_first_byte_ms is None
+        assert metrics.latency_ms == 400.0
+        assert metrics.processing_time_ms == 380.0
+        assert metrics.characters_per_second == 50.0
+        assert metrics.time_to_first_byte_ms == 120.0
+        assert metrics.total_stream_duration_ms == 400.0
+        assert metrics.total_chunks == 8
+
+    def test_create_tts_metrics_invoke_mode(self):
+        """Should create TTSPerformanceMetrics for invoke mode (streaming fields None)"""
+        metrics = TTSPerformanceMetrics(
+            latency_ms=400.0,
+            processing_time_ms=380.0,
+        )
+
+        assert metrics.latency_ms == 400.0
+        assert metrics.processing_time_ms == 380.0
+        # Streaming fields should be None
+        assert metrics.time_to_first_byte_ms is None
+        assert metrics.total_stream_duration_ms is None
+        assert metrics.total_chunks is None

@@ -13,8 +13,15 @@ Key design principles:
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
-from app.models.engine import EngineConfig, STTChunk, STTResponse, TTSChunk, TTSResponse
-from app.utils.exceptions import EngineNotReadyError
+from app.exceptions import EngineNotReadyError
+from app.models.engine import (
+    EngineConfig,
+    STTChunk,
+    STTResponse,
+    TTSChunk,
+    TTSResponse,
+)
+from app.types.audio import AudioInput
 
 
 class BaseEngine(ABC):
@@ -127,7 +134,7 @@ class BaseSTTEngine(BaseEngine):
 
     @abstractmethod
     async def transcribe(
-        self, audio_data: bytes, language: str | None = None
+        self, audio_data: bytes, language: str | None = None, **kwargs
     ) -> STTResponse:
         """
         Transcribe audio (invoke/batch mode)
@@ -135,6 +142,7 @@ class BaseSTTEngine(BaseEngine):
         Args:
             audio_data: Audio file as bytes
             language: Optional language hint (e.g., "en", "es")
+            **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Returns:
             STTResponse with text and STTPerformanceMetrics
@@ -143,16 +151,22 @@ class BaseSTTEngine(BaseEngine):
 
     @abstractmethod
     async def transcribe_stream(
-        self, audio_stream: AsyncIterator[bytes]
-    ) -> AsyncIterator[STTChunk]:
+        self, audio_data: AudioInput, language: str | None = None, **kwargs
+    ) -> AsyncIterator[STTChunk | STTResponse]:
         """
-        Transcribe audio stream (streaming mode)
+        Transcribe audio in streaming mode (progressive results)
+
+        Processes audio and yields progressive transcription chunks,
+        followed by a final STTResponse with complete results and metrics.
 
         Args:
-            audio_stream: Async iterator of audio chunks
+            audio_data: Audio input (bytes, numpy array, file path, or BytesIO)
+            language: Optional language code (e.g., 'en', 'es')
+            **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Yields:
-            STTChunk with partial/final text (STTStreamSummary at end)
+            STTChunk: Partial transcription chunks (progressive results)
+            STTResponse: Final response with complete text, segments, and metrics
         """
         pass
 
@@ -180,10 +194,7 @@ class BaseTTSEngine(BaseEngine):
 
     @abstractmethod
     async def synthesize(
-        self,
-        text: str,
-        voice: str | None = None,
-        speed: float = 1.0,
+        self, text: str, voice: str | None = None, speed: float = 1.0, **kwargs
     ) -> TTSResponse:
         """
         Synthesize text to speech (invoke/batch mode)
@@ -192,6 +203,7 @@ class BaseTTSEngine(BaseEngine):
             text: Text to synthesize
             voice: Optional voice name (overrides config default)
             speed: Speech speed (1.0 = normal, overrides config default)
+            **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Returns:
             TTSResponse with audio and TTSPerformanceMetrics
@@ -199,16 +211,22 @@ class BaseTTSEngine(BaseEngine):
         pass
 
     @abstractmethod
-    async def synthesize_stream(self, text: str, **kwargs) -> AsyncIterator[TTSChunk]:
+    async def synthesize_stream(
+        self, text: str, **kwargs
+    ) -> AsyncIterator[TTSChunk | TTSResponse]:
         """
         Synthesize text to speech (streaming mode)
+
+        Generates audio chunks progressively, followed by a final TTSResponse
+        with complete metadata and metrics.
 
         Args:
             text: Text to synthesize
             **kwargs: Engine-specific params (voice, speed, etc.)
 
         Yields:
-            TTSChunk with audio chunks (TTSStreamSummary at end)
+            TTSChunk: Audio chunks with progressive generation
+            TTSResponse: Final response with complete audio metadata and metrics
         """
         pass
 

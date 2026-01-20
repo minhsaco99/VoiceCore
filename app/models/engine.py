@@ -5,8 +5,8 @@ Design:
 - STTRequest: Unified for REST (with audio_data) and WebSocket config (audio_data=None)
 - TTSRequest: REST only with stream_response option
 - Lightweight chunks for streaming (minimal per-chunk metrics)
-- Full response models with complete metrics for invoke mode
-- Stream summaries for aggregate metrics at end of stream
+- Full response models (STTResponse/TTSResponse) used for both invoke and streaming modes
+- STTPerformanceMetrics/TTSPerformanceMetrics: Extended with streaming-specific fields
 """
 
 from typing import Any, Literal
@@ -17,7 +17,6 @@ from app.models.metrics import (
     STTPerformanceMetrics,
     TTSPerformanceMetrics,
 )
-
 
 # =============================================================================
 # Configuration
@@ -114,11 +113,11 @@ class STTChunk(BaseModel):
     """
     Streaming chunk from STT
 
-    Lightweight model for real-time streaming - heavy metrics in STTStreamSummary
+    Lightweight model for real-time streaming - represents partial transcription results.
+    Stream ends when STTResponse is received instead of STTChunk.
     """
 
-    text: str = Field(..., description="Partial or final transcription text")
-    is_final: bool = Field(default=False, description="Is this the final chunk?")
+    text: str = Field(..., description="Partial transcription text")
     timestamp: float | None = Field(
         None, description="Timestamp position in audio (seconds)"
     )
@@ -136,11 +135,11 @@ class TTSChunk(BaseModel):
     """
     Streaming chunk from TTS
 
-    Lightweight model for real-time audio streaming
+    Lightweight model for real-time audio streaming - represents partial audio generation.
+    Stream ends when TTSResponse is received instead of TTSChunk.
     """
 
     audio_data: bytes = Field(..., description="Audio chunk bytes")
-    is_final: bool = Field(default=False, description="Is this the final chunk?")
     sequence_number: int = Field(..., ge=0, description="Chunk sequence for ordering")
 
     # Per-chunk timing only
@@ -204,48 +203,3 @@ class TTSResponse(BaseModel):
     performance_metrics: TTSPerformanceMetrics | None = Field(
         None, description="Performance metrics"
     )
-
-
-# =============================================================================
-# Stream Summary Models (Sent at end of streaming session)
-# =============================================================================
-
-
-class STTStreamSummary(BaseModel):
-    """
-    Summary sent at end of STT streaming session
-
-    Aggregates metrics that only make sense after stream completes
-    """
-
-    total_text: str = Field(..., description="Complete accumulated transcription")
-    total_chunks: int = Field(..., ge=0, description="Number of chunks sent")
-    audio_duration_seconds: float | None = Field(
-        None, ge=0, description="Total audio duration processed"
-    )
-
-    # Aggregate timing metrics
-    time_to_first_token_ms: float | None = Field(
-        None, description="TTFT - Time to first token"
-    )
-    total_duration_ms: float | None = Field(None, description="Total stream duration")
-
-
-class TTSStreamSummary(BaseModel):
-    """
-    Summary sent at end of TTS streaming session
-
-    Aggregates metrics that only make sense after stream completes
-    """
-
-    total_bytes: int = Field(..., ge=0, description="Total audio bytes sent")
-    total_chunks: int = Field(..., ge=0, description="Number of chunks sent")
-    audio_duration_seconds: float | None = Field(
-        None, ge=0, description="Total audio duration generated"
-    )
-
-    # Aggregate timing metrics
-    time_to_first_byte_ms: float | None = Field(
-        None, description="TTFB - Time to first audio byte"
-    )
-    total_duration_ms: float | None = Field(None, description="Total stream duration")

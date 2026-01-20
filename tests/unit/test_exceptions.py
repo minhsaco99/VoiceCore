@@ -1,4 +1,4 @@
-from app.utils.exceptions import (
+from app.exceptions import (
     # Audio & Input
     AudioError,
     AudioTooLargeError,
@@ -22,6 +22,7 @@ from app.utils.exceptions import (
     SynthesisError,
     TimeoutError,
     TranscriptionError,
+    TranscriptionTimeoutError,
     UnsupportedFormatError,
     VoiceEngineError,
 )
@@ -50,6 +51,7 @@ class TestExceptionHierarchy:
             ConfigurationError,
             ResourceExhaustedError,
             TimeoutError,
+            TranscriptionTimeoutError,
             EngineNotFoundError,
         ]
 
@@ -76,6 +78,10 @@ class TestExceptionHierarchy:
         """Streaming-specific errors should inherit from StreamingError"""
         assert issubclass(StreamingNotSupportedError, StreamingError)
         assert issubclass(StreamInterruptedError, StreamingError)
+
+    def test_timeout_specific_errors_inherit_from_timeout_error(self):
+        """Timeout-specific errors should inherit from TimeoutError"""
+        assert issubclass(TranscriptionTimeoutError, TimeoutError)
 
 
 class TestExceptionMessages:

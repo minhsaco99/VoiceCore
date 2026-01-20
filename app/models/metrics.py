@@ -14,7 +14,6 @@ Industry benchmarks (2024):
 
 from pydantic import BaseModel, Field
 
-
 # =============================================================================
 # STT Performance Metrics
 # =============================================================================
@@ -22,10 +21,10 @@ from pydantic import BaseModel, Field
 
 class STTPerformanceMetrics(BaseModel):
     """
-    Performance metrics for STT processing
+    Performance metrics for STT processing (invoke and streaming modes)
 
-    Used in STTResponse for invoke/batch mode.
-    Streaming metrics are in STTStreamSummary.
+    Used in STTResponse for both invoke and streaming modes.
+    Streaming-specific fields are None in invoke mode.
     """
 
     # Core timing (required)
@@ -44,6 +43,17 @@ class STTPerformanceMetrics(BaseModel):
         description="RTF = processing_time / audio_duration (<1.0 = faster than real-time)",
     )
 
+    # Streaming-specific metrics (None in invoke mode)
+    time_to_first_token_ms: float | None = Field(
+        None, description="TTFT - Time to first token (streaming only)"
+    )
+    total_stream_duration_ms: float | None = Field(
+        None, description="Total stream duration end-to-end (streaming only)"
+    )
+    total_chunks: int | None = Field(
+        None, ge=0, description="Number of chunks yielded (streaming only)"
+    )
+
 
 # =============================================================================
 # TTS Performance Metrics
@@ -52,10 +62,10 @@ class STTPerformanceMetrics(BaseModel):
 
 class TTSPerformanceMetrics(BaseModel):
     """
-    Performance metrics for TTS processing
+    Performance metrics for TTS processing (invoke and streaming modes)
 
-    Used in TTSResponse for invoke/batch mode.
-    Streaming metrics are in TTSStreamSummary.
+    Used in TTSResponse for both invoke and streaming modes.
+    Streaming-specific fields are None in invoke mode.
     """
 
     # Core timing (required)
@@ -72,4 +82,15 @@ class TTSPerformanceMetrics(BaseModel):
     real_time_factor: float | None = Field(
         None,
         description="RTF = processing_time / audio_duration (<1.0 = faster than real-time)",
+    )
+
+    # Streaming-specific metrics (None in invoke mode)
+    time_to_first_byte_ms: float | None = Field(
+        None, description="TTFB - Time to first audio byte (streaming only)"
+    )
+    total_stream_duration_ms: float | None = Field(
+        None, description="Total stream duration end-to-end (streaming only)"
+    )
+    total_chunks: int | None = Field(
+        None, ge=0, description="Number of chunks yielded (streaming only)"
     )
