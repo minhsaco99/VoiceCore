@@ -75,6 +75,15 @@ curl -X POST "http://localhost:8000/api/v1/stt/transcribe?engine=whisper" \
   -F "file=@audio.wav"
 ```
 
+### Deployment
+
+```bash
+# Run with Docker Compose
+docker-compose up -d --build
+```
+
+See [docs/deployment.md](docs/deployment.md) for full deployment guide.
+
 ## API Overview
 
 | Method | Endpoint | Description |

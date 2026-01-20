@@ -1,0 +1,32 @@
+services:
+  voice-engine:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.whisper-gpu
+    image: voice-engine-api:whisper
+    container_name: voice-engine
+    ports:
+      - "8000:8000"
+    volumes:
+      - huggingface_cache:/app/.cache/huggingface
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - ENGINE_CONFIG_PATH=engines.yaml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: ["gpu"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  huggingface_cache:
