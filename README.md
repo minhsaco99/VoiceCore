@@ -31,7 +31,7 @@ It abstracts away the complexities of model management, threading, and resource 
 ## 🏗️ Architecture
 
 <p align="center">
-  <img src="figures/architecture.svg" alt="Architecture Diagram" width="500" height="425">
+  <img src="figures/architecture.svg" alt="Architecture Diagram" width="100%", height="425">
 </p>
 
 
