@@ -30,9 +30,10 @@ It abstracts away the complexities of model management, threading, and resource 
 
 ## 🏗️ Architecture
 
-![Architecture Diagram](figures/architecture.svg)
+<p align="center">
+  <img src="figures/architecture.svg" alt="Architecture Diagram" width="500" height="425">
+</p>
 
----
 
 ## 🚀 Quick Start
 
