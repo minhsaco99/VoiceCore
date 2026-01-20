@@ -6,9 +6,9 @@ stt:
     enabled: true
     engine_class: "app.engines.stt.whisper.engine.WhisperSTTEngine"
     config:
-      model_name: "base"
-      device: "cpu"
-      compute_type: "int8"
+      model_name: "large-v3"
+      device: "cuda"
+      compute_type: "float16"
       timeout_seconds: 300
 
   # Example: Google STT (disabled by default)

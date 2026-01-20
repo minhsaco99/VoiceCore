@@ -79,7 +79,27 @@ make dev-api
 uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
----
+### Deployment
+
+```bash
+# Run with Docker Compose
+docker-compose up -d --build
+```
+
+See [docs/deployment.md](docs/deployment.md) for full deployment guide.
+
+## API Overview
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/health` | Health check |
+| GET | `/api/v1/ready` | Readiness check (engine status) |
+| GET | `/api/v1/engines` | List available engines |
+| POST | `/api/v1/stt/transcribe` | Batch transcription |
+| POST | `/api/v1/stt/transcribe/stream` | SSE streaming transcription |
+| WS | `/api/v1/stt/transcribe/ws` | WebSocket real-time transcription |
+
+See [docs/api.md](docs/api.md) for full API documentation.
 
 ## 🎮 Usage Examples
 

@@ -1,0 +1,62 @@
+# =============================================================================
+# Voice Engine API - Dockerfile Template
+# =============================================================================
+# Use this template as a starting point for creating Dockerfiles for your
+# custom engines. Replace placeholders marked with <...> with your values.
+#
+# See docs/deployment.md for detailed instructions.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Builder
+# -----------------------------------------------------------------------------
+FROM python:3.12-slim AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+
+# Install base dependencies + your engine group
+# Replace <your-engine-group> with your dependency group name from pyproject.toml
+RUN uv sync --frozen --no-dev --group <your-engine-group>
+
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime
+# -----------------------------------------------------------------------------
+FROM python:3.12-slim AS runtime
+
+# Install system dependencies required by your engine
+# Add or remove packages as needed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    # <add-your-system-dependencies-here>
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/.venv /app/.venv
+
+COPY app/ ./app/
+COPY engines.yaml ./
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+ENV HOST=0.0.0.0
+ENV PORT=8000
+ENV ENGINE_CONFIG_PATH=engines.yaml
+
+# Add engine-specific environment variables
+# ENV <YOUR_ENGINE_API_KEY>=
+# ENV <YOUR_ENGINE_CONFIG>=
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
+
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,108 @@
+# =============================================================================
+# Voice Engine API - Whisper Engine (CUDA GPU)
+# =============================================================================
+# Dockerfile for running Voice Engine API with Whisper STT on NVIDIA GPU.
+# Uses faster-whisper with CUDA acceleration (float16).
+#
+# Requirements:
+#   - NVIDIA GPU with CUDA support
+#   - NVIDIA Container Toolkit installed on host
+#
+# Build:
+#   docker build -f docker/Dockerfile.whisper-gpu -t voice-engine-api:whisper-gpu .
+#
+# Run:
+#   docker run --gpus all -p 8000:8000 voice-engine-api:whisper-gpu
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Builder - Install dependencies with uv
+# -----------------------------------------------------------------------------
+FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04 AS builder
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python 3.12 and uv
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies (base + whisper group)
+RUN uv sync --frozen --no-dev --group whisper
+
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime - CUDA-enabled production image
+# -----------------------------------------------------------------------------
+FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04 AS runtime
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python 3.12 and runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/python3.12 /usr/bin/python
+
+WORKDIR /app
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy application code
+COPY app/ ./app/
+COPY engines.yaml ./
+
+# Set environment variables
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# CUDA settings
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# API Configuration
+ENV HOST=0.0.0.0
+ENV PORT=8000
+ENV ENGINE_CONFIG_PATH=engines.yaml
+
+# Model cache directory
+ENV HF_HOME=/app/.cache/huggingface
+ENV XDG_CACHE_HOME=/app/.cache
+
+# Create cache directory
+RUN mkdir -p /app/.cache
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
+
+# Run the application
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
