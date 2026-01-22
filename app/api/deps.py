@@ -53,13 +53,13 @@ async def validate_audio_upload(
 ) -> bytes | None:
     """
     Validate and read uploaded audio file
-    
+
     Args:
         audio: Uploaded audio file
         settings: App settings for size limits
         required: If True, raises error when audio is missing/empty.
                   If False, returns None when audio is missing/empty.
-    
+
     Returns:
         Audio bytes or None (if not required and no audio provided)
     """
@@ -67,7 +67,7 @@ async def validate_audio_upload(
         if required:
             raise HTTPException(400, "Audio file is required")
         return None
-    
+
     max_size = settings.max_audio_size_mb * 1024 * 1024
     audio_bytes = await audio.read(max_size + 1)
 

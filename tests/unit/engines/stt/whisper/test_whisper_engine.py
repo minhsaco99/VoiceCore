@@ -1,6 +1,10 @@
 """Tests for Whisper STT engine"""
 
 import io
+
+import pytest
+
+pytest.importorskip("faster_whisper")
 import pathlib
 from unittest.mock import MagicMock, patch
 

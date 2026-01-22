@@ -24,7 +24,7 @@ tts:
     enabled: true
     engine_class: "app.engines.tts.voxcpm.engine.VoxCPMEngine"
     config:
-      model_name: "openbmb/VoxCPM0.5" # Or "openbmb/VoxCPM1.5"
+      model_name: "openbmb/VoxCPM-0.5B" # Or "openbmb/VoxCPM1.5"
       device: "cuda"
       # prompt_wav_path: "path/to/prompt.wav" # Optional
       # prompt_text: "Transcript of prompt"   # Optional
