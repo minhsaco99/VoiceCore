@@ -238,6 +238,107 @@ ws.onmessage = (event) => {
 
 ---
 
+### Text-to-Speech (TTS)
+
+#### POST /tts/synthesize
+
+Batch synthesis - convert text to speech audio.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `engine` | string | Yes | Engine name (e.g., "coqui") |
+| `text` | string | Yes | Text to synthesize |
+| `voice` | string | No | Voice name/ID to use |
+| `speed` | float | No | Speech speed multiplier (0 < speed <= 3.0, default: 1.0) |
+| `engine_params` | string | No | JSON string with engine-specific parameters |
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=coqui&text=Hello%20world&voice=en-US-1&speed=1.0"
+```
+
+**Response:**
+
+```json
+{
+  "audio_data": "<base64-encoded-audio>",
+  "sample_rate": 22050,
+  "duration_seconds": 1.5,
+  "format": "wav",
+  "performance_metrics": {
+    "latency_ms": 250.5,
+    "processing_time_ms": 200.0,
+    "audio_duration_ms": 1500.0,
+    "real_time_factor": 0.13,
+    "characters_processed": 11
+  }
+}
+```
+
+#### POST /tts/synthesize/stream
+
+SSE (Server-Sent Events) streaming synthesis - receive progressive audio chunks.
+
+**Query Parameters:**
+
+Same as `/tts/synthesize`.
+
+**Response:**
+
+Server-Sent Events stream with two event types:
+
+1. **chunk** - Partial audio data
+
+```
+event: chunk
+data: {"audio_data": "<base64-chunk>", "sequence_number": 0, "chunk_latency_ms": 25.5}
+```
+
+2. **complete** - Final complete response
+
+```
+event: complete
+data: {"audio_data": "<base64-full-audio>", "sample_rate": 22050, "duration_seconds": 1.5, "format": "wav", "performance_metrics": {...}}
+```
+
+**Example:**
+
+```bash
+curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=coqui&text=Hello%20world"
+```
+
+**JavaScript Client Example:**
+
+```javascript
+const params = new URLSearchParams({
+  engine: 'coqui',
+  text: 'Hello, how are you today?',
+  voice: 'en-US-1',
+  speed: '1.0'
+});
+
+const eventSource = new EventSource(
+  `http://localhost:8000/api/v1/tts/synthesize/stream?${params}`
+);
+
+eventSource.addEventListener('chunk', (event) => {
+  const chunk = JSON.parse(event.data);
+  // Process audio chunk
+  console.log('Chunk:', chunk.sequence_number);
+});
+
+eventSource.addEventListener('complete', (event) => {
+  const result = JSON.parse(event.data);
+  console.log('Complete, duration:', result.duration_seconds);
+  eventSource.close();
+});
+```
+
+---
+
 ## Data Models
 
 ### STTResponse
@@ -284,6 +385,42 @@ Performance metrics for transcription.
 | `audio_duration_ms` | float | Audio duration |
 | `real_time_factor` | float | Processing time / audio duration |
 | `time_to_first_token_ms` | float | Time to first result (streaming) |
+| `total_stream_duration_ms` | float | Total streaming duration |
+| `total_chunks` | int | Number of chunks (streaming) |
+
+### TTSResponse
+
+Complete synthesis response.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `audio_data` | bytes | Complete generated audio |
+| `sample_rate` | int | Audio sample rate in Hz |
+| `duration_seconds` | float | Audio duration in seconds |
+| `format` | string | Audio format (wav, mp3, etc.) |
+| `performance_metrics` | TTSPerformanceMetrics | Performance metrics |
+
+### TTSChunk
+
+Streaming chunk for partial audio.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `audio_data` | bytes | Audio chunk bytes |
+| `sequence_number` | int | Chunk sequence for ordering |
+| `chunk_latency_ms` | float | Generation latency for this chunk |
+
+### TTSPerformanceMetrics
+
+Performance metrics for synthesis.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `latency_ms` | float | Total end-to-end latency |
+| `processing_time_ms` | float | Model processing time |
+| `real_time_factor` | float | Processing time / audio duration |
+| `characters_per_second` | float | Text-to-audio synthesis speed |
+| `time_to_first_byte_ms` | float | Time to first audio byte (streaming) |
 | `total_stream_duration_ms` | float | Total streaming duration |
 | `total_chunks` | int | Number of chunks (streaming) |
 
