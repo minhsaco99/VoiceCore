@@ -26,6 +26,17 @@ It abstracts away the complexities of model management, threading, and resource 
 | **🛡️ Production Ready** | Includes health checks, readiness probes, OpenTelemetry-ready metrics hooks, and graceful shutdown. |
 | **🐳 Docker Friendly** | Ready for containerization with environment-variable overrides for flexible deployments. |
 
+### 🤔 Why VoiceCore?
+
+| Feature | Why It Matters |
+| ------- | -------------- |
+| **Pluggable Engines** | Swap Whisper for Google/Azure/custom engines without changing application code |
+| **Word-Level Timestamps** | Essential for subtitles, karaoke apps, audio-text alignment |
+| **Built-in Performance Metrics** | RTF, latency, time-to-first-token included in every response |
+| **Triple Streaming Modes** | Batch, SSE, and WebSocket - pick the right mode for your use case |
+| **YAML Configuration** | Switch models, devices (CPU/GPU), or compute types without code changes |
+| **Self-Hosted** | Full data privacy, no API costs, works offline |
+
 ---
 
 ## 🏗️ Architecture
