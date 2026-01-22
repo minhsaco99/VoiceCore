@@ -1,4 +1,4 @@
-# 🎙️ Voice Engine API
+# 🎙️ VoiceCore
 
 > **A production-ready, async-native FastAPI framework for building high-performance Speech-to-Text (STT) and Text-to-Speech (TTS) applications.**
 
@@ -11,7 +11,7 @@
 
 ## ⚡ Overview
 
-Voice Engine API is a modular framework designed to simplify the integration of various speech AI models into a unified, high-performance API. Whether you need batch processing, real-time streaming via Server-Sent Events (SSE), or low-latency WebSocket communication, this project provides the robust foundation you need.
+VoiceCore is a modular framework designed to simplify the integration of various speech AI models into a unified, high-performance API. Whether you need batch processing, real-time streaming via Server-Sent Events (SSE), or low-latency WebSocket communication, this project provides the robust foundation you need.
 
 It abstracts away the complexities of model management, threading, and resource allocation, allowing you to focus on building great voice-enabled applications.
 
