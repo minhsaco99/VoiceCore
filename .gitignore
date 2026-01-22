@@ -214,3 +214,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local/debug artifacts
+debug_output.wav
+# Manual test scripts
+tests/manual_voxcpm.py
