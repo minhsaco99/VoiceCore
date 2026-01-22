@@ -194,7 +194,12 @@ class BaseTTSEngine(BaseEngine):
 
     @abstractmethod
     async def synthesize(
-        self, text: str, voice: str | None = None, speed: float = 1.0, **kwargs
+        self,
+        text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        speaker_wav: bytes | None = None,
+        **kwargs,
     ) -> TTSResponse:
         """
         Synthesize text to speech (invoke/batch mode)
@@ -212,7 +217,12 @@ class BaseTTSEngine(BaseEngine):
 
     @abstractmethod
     async def synthesize_stream(
-        self, text: str, **kwargs
+        self,
+        text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        speaker_wav: bytes | None = None,
+        **kwargs,
     ) -> AsyncIterator[TTSChunk | TTSResponse]:
         """
         Synthesize text to speech (streaming mode)

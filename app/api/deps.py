@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, File, HTTPException, Query, Request, UploadFile
 
 from app.api.config import Settings
 from app.api.registry import EngineRegistry
@@ -46,10 +46,28 @@ def get_tts_engine(
 
 
 async def validate_audio_upload(
-    audio: UploadFile,
+    audio: UploadFile | None,
     settings: Settings = Depends(get_settings),
-) -> bytes:
-    """Validate and read uploaded audio file"""
+    *,
+    required: bool = True,
+) -> bytes | None:
+    """
+    Validate and read uploaded audio file
+    
+    Args:
+        audio: Uploaded audio file
+        settings: App settings for size limits
+        required: If True, raises error when audio is missing/empty.
+                  If False, returns None when audio is missing/empty.
+    
+    Returns:
+        Audio bytes or None (if not required and no audio provided)
+    """
+    if not audio:
+        if required:
+            raise HTTPException(400, "Audio file is required")
+        return None
+    
     max_size = settings.max_audio_size_mb * 1024 * 1024
     audio_bytes = await audio.read(max_size + 1)
 
@@ -58,6 +76,16 @@ async def validate_audio_upload(
             413, f"Audio too large (max {settings.max_audio_size_mb}MB)"
         )
     if len(audio_bytes) == 0:
-        raise HTTPException(400, "Audio file is empty")
+        if required:
+            raise HTTPException(400, "Audio file is empty")
+        return None
 
     return audio_bytes
+
+
+async def get_optional_audio_upload(
+    audio: UploadFile = File(None),
+    settings: Settings = Depends(get_settings),
+) -> bytes | None:
+    """Dependency wrapper for optional audio upload validation"""
+    return await validate_audio_upload(audio, settings, required=False)
