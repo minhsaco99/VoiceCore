@@ -162,14 +162,14 @@ def test_synthesize_and_stream_raise_when_model_missing():
         with pytest.raises(ImportError):
             await engine.synthesize(text="hi")
 
-    asyncio.get_event_loop().run_until_complete(run_synth())
+    asyncio.run(run_synth())
 
     async def run_stream():
         with pytest.raises(ImportError):
             async for _ in engine.synthesize_stream(text="hi"):
                 pass
 
-    asyncio.get_event_loop().run_until_complete(run_stream())
+    asyncio.run(run_stream())
     monkeypatch.undo()
 
 

@@ -85,4 +85,4 @@ def test_initialize_raises_when_dependency_missing(monkeypatch):
     with pytest.raises(ImportError):
         import asyncio
 
-        asyncio.get_event_loop().run_until_complete(engine._initialize())
+        asyncio.run(engine._initialize())
