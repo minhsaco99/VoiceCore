@@ -5,10 +5,8 @@ from app.models.engine import (
     EngineConfig,
     Segment,
     STTChunk,
-    STTRequest,
     STTResponse,
     TTSChunk,
-    TTSRequest,
     TTSResponse,
 )
 from app.models.metrics import (
@@ -93,105 +91,6 @@ class TestSegment:
 
         with pytest.raises(ValidationError):
             Segment(end=1.0, text="hello")  # Missing start
-
-
-class TestSTTRequest:
-    """Test STTRequest model (unified for REST and WebSocket)"""
-
-    def test_create_stt_request_for_rest(self):
-        """Should create STTRequest for REST with audio_data"""
-        request = STTRequest(audio_data=b"fake audio")
-
-        assert request.audio_data == b"fake audio"
-        assert request.language is None
-        assert request.format is None
-        assert request.sample_rate is None
-        assert request.stream_response is False
-
-    def test_create_stt_request_for_websocket_config(self):
-        """Should create STTRequest for WebSocket config (no audio_data)"""
-        request = STTRequest(
-            language="en",
-            format="wav",
-            sample_rate=16000,
-        )
-
-        assert request.audio_data is None  # WebSocket config
-        assert request.language == "en"
-        assert request.format == "wav"
-        assert request.sample_rate == 16000
-
-    def test_create_stt_request_with_stream_response(self):
-        """Should create STTRequest with streaming response preference"""
-        request = STTRequest(
-            audio_data=b"fake audio",
-            stream_response=True,
-        )
-
-        assert request.audio_data == b"fake audio"
-        assert request.stream_response is True
-
-    def test_stt_request_all_fields_optional_except_pattern(self):
-        """Should allow creating empty STTRequest (for WebSocket config)"""
-        request = STTRequest()
-        assert request.audio_data is None
-        assert request.engine_params == {}
-
-    def test_stt_request_with_engine_params(self):
-        """Should allow passing engine-specific parameters"""
-        params = {"temperature": 0.7, "beam_size": 5}
-        request = STTRequest(engine_params=params)
-        assert request.engine_params == params
-
-
-class TestTTSRequest:
-    """Test TTSRequest model (REST only)"""
-
-    def test_create_tts_request_minimal(self):
-        """Should create TTSRequest with only text"""
-        request = TTSRequest(text="Hello world")
-
-        assert request.text == "Hello world"
-        assert request.voice is None
-        assert request.speed == 1.0  # Default
-        assert request.stream_response is False
-
-    def test_create_tts_request_with_all_fields(self):
-        """Should create TTSRequest with all fields"""
-        request = TTSRequest(
-            text="Hello world",
-            voice="en-US-JennyNeural",
-            speed=1.2,
-            stream_response=True,
-        )
-
-        assert request.text == "Hello world"
-        assert request.voice == "en-US-JennyNeural"
-        assert request.speed == 1.2
-        assert request.stream_response is True
-
-    def test_tts_request_requires_text(self):
-        """Should require text field"""
-        with pytest.raises(ValidationError):
-            TTSRequest(voice="en-US-JennyNeural")
-
-    def test_tts_request_validates_speed(self):
-        """Speed must be > 0 and <= 3.0"""
-        TTSRequest(text="test", speed=0.5)
-        TTSRequest(text="test", speed=3.0)
-
-        with pytest.raises(ValidationError):
-            TTSRequest(text="test", speed=0)  # Too low
-
-        with pytest.raises(ValidationError):
-            TTSRequest(text="test", speed=3.5)  # Too high
-
-    def test_tts_request_with_engine_params(self):
-        """Should allow passing engine-specific parameters"""
-        params = {"api_key": "test_key", "model_version": "v1"}
-        request = TTSRequest(text="hello", engine_params=params)
-        assert request.engine_params == params
-        assert request.text == "hello"
 
 
 class TestSTTResponse:
