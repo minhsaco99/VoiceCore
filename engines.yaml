@@ -19,7 +19,16 @@ stt:
   #     api_key: "${GOOGLE_API_KEY}"  # Read from env var
   #     language: "en-US"
 
-tts: {}
+tts:
+  voxcpm:
+    enabled: true
+    engine_class: "app.engines.tts.voxcpm.engine.VoxCPMEngine"
+    config:
+      model_name: "openbmb/VoxCPM0.5" # Or "openbmb/VoxCPM1.5"
+      device: "cuda"
+      # prompt_wav_path: "path/to/prompt.wav" # Optional
+      # prompt_text: "Transcript of prompt"   # Optional
+
   # Example: Coqui TTS (disabled)
   # coqui:
   #   enabled: false
