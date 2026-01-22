@@ -20,6 +20,8 @@ dependencies = [
     "pyyaml>=6.0.2",
 ]
 
+
+
 [tool.ruff]
 line-length = 88
 target-version = "py312"
@@ -81,6 +83,10 @@ whisper = [
 # ]
 
 # TTS Models
+voxcpm = [
+    "voxcpm>=0.0.1", # Use latest available
+]
+
 # coqui-tts = [
 #     "TTS>=0.20.0",
 # ]
