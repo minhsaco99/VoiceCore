@@ -2,14 +2,12 @@
 Engine configuration and input/output data models for STT/TTS
 
 Design:
-- STTRequest: Unified for REST (with audio_data) and WebSocket config (audio_data=None)
-- TTSRequest: REST only with stream_response option
 - Lightweight chunks for streaming (minimal per-chunk metrics)
 - Full response models (STTResponse/TTSResponse) used for both invoke and streaming modes
 - STTPerformanceMetrics/TTSPerformanceMetrics: Extended with streaming-specific fields
 """
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -39,69 +37,6 @@ class EngineConfig(BaseModel):
     )
     max_workers: int = Field(default=1, ge=1, description="Max parallel workers")
     timeout_seconds: int = Field(default=300, ge=1, description="Processing timeout")
-
-
-# =============================================================================
-# Request Models
-# =============================================================================
-
-
-class STTRequest(BaseModel):
-    """
-    Input for STT processing (REST or WebSocket)
-
-    Usage:
-    - REST POST: audio_data is required, stream_response controls output format
-    - WebSocket config: audio_data=None, subsequent messages are raw audio bytes
-    """
-
-    # Audio - required for REST, None for WebSocket config message
-    audio_data: bytes | None = Field(
-        None, description="Audio bytes (REST) or None (WebSocket config)"
-    )
-
-    # Config options
-    language: str | None = Field(None, description="Language hint (e.g., 'en', 'vi')")
-    format: str | None = Field(None, description="Audio format hint (wav, mp3, webm)")
-    sample_rate: int | None = Field(
-        None, description="Sample rate in Hz (important for streaming)"
-    )
-
-    # Response preference (REST only)
-    stream_response: bool = Field(
-        default=False, description="Return StreamingResponse chunks vs full response"
-    )
-
-    # Engine-specific parameters (flexible dict)
-    engine_params: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Engine-specific parameters (e.g., temperature, beam_size, api_keys)",
-    )
-
-
-class TTSRequest(BaseModel):
-    """
-    Input for TTS processing (REST only)
-
-    stream_response controls whether to return full audio or StreamingResponse
-    """
-
-    text: str = Field(..., description="Text to synthesize")
-    voice: str | None = Field(None, description="Voice name/ID to use")
-    speed: float = Field(
-        default=1.0, gt=0, le=3.0, description="Speech speed multiplier"
-    )
-
-    # Response preference
-    stream_response: bool = Field(
-        default=False, description="Return StreamingResponse chunks vs full response"
-    )
-
-    # Engine-specific parameters (flexible dict)
-    engine_params: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Engine-specific parameters (e.g., temperature, beam_size, api_keys)",
-    )
 
 
 # =============================================================================
