@@ -98,6 +98,8 @@ See [docs/deployment.md](docs/deployment.md) for full deployment guide.
 | POST | `/api/v1/stt/transcribe` | Batch transcription |
 | POST | `/api/v1/stt/transcribe/stream` | SSE streaming transcription |
 | WS | `/api/v1/stt/transcribe/ws` | WebSocket real-time transcription |
+| POST | `/api/v1/tts/synthesize` | Batch text-to-speech |
+| POST | `/api/v1/tts/synthesize/stream` | Streaming text-to-speech |
 
 See [docs/api.md](docs/api.md) for full API documentation.
 
@@ -128,6 +130,20 @@ curl -N -X POST "http://localhost:8000/api/v1/stt/transcribe/stream?engine=whisp
   -F "file=@/path/to/audio.wav"
 ```
 
+### 🔊 Text-to-Speech (TTS)
+
+**Batch Synthesis**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=coqui&text=Hello%20world&voice=en-US-1&speed=1.0"
+```
+
+**Streaming Synthesis**
+
+```bash
+curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=coqui&text=Hello%20world"
+```
+
 ---
 
 ## 📚 Documentation
@@ -137,6 +153,7 @@ Detailed documentation is available in the `docs/` directory:
 *   **[📖 API Reference](docs/api.md)**: Full details on all REST, SSE, and WebSocket endpoints.
 *   **[⚙️ Configuration Guide](docs/configuration.md)**: How to configure engines, environment variables, and the `engines.yaml` file.
 *   **[🛠️ Custom Engines](docs/custom-engines.md)**: A step-by-step guide to building and integrating your own STT or TTS engines.
+*   **[🚀 Deployment Guide](docs/deployment.md)**: Docker and production deployment.
 
 ---
 
