@@ -85,6 +85,16 @@ whisper = [
 #     "TTS>=0.20.0",
 # ]
 
+voxcpm = [
+    "voxcpm>=0.1.0",
+]
+
+# Optional: Required for VoxCPM voice cloning feature
+# Install with: uv sync --group voxcpm-clone
+voxcpm-clone = [
+    "torchcodec>=0.1.0",  # For loading reference audio in voice cloning
+]
+
 # Development tools
 dev = [
     "pre-commit>=4.5.1",

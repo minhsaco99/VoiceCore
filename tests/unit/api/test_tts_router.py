@@ -1,53 +1,158 @@
-"""Unit tests for TTS router endpoints (stubs)"""
+"""Unit tests for TTS router endpoints"""
+
+import base64
 
 
-class TestTTSRouter:
-    """TTS router stub endpoint tests"""
+class TestSynthesizeEndpoint:
+    """POST /synthesize tests"""
 
-    def test_synthesize_returns_501(self, client_both):
-        """POST /synthesize returns 501"""
+    def test_returns_200_with_valid_text(self, client_both):
+        """Returns 200 with valid text and audio data"""
         response = client_both.post(
             "/api/v1/tts/synthesize",
-            params={"text": "Hello", "engine": "default"},
+            params={"text": "Hello world", "engine": "default"},
         )
 
-        assert response.status_code == 501
+        assert response.status_code == 200
+        data = response.json()
+        assert "audio_data" in data
+        assert "sample_rate" in data
+        assert "duration_seconds" in data
+        assert "format" in data
 
-    def test_synthesize_stream_returns_501(self, client_both):
-        """POST /synthesize/stream returns 501"""
+        # Verify audio is base64 encoded
+        audio_bytes = base64.b64decode(data["audio_data"])
+        assert len(audio_bytes) > 0
+
+    def test_returns_422_when_missing_text(self, client_both):
+        """Returns 422 when text param missing"""
+        response = client_both.post(
+            "/api/v1/tts/synthesize",
+            params={"engine": "default"},
+        )
+
+        assert response.status_code == 422
+
+    def test_returns_404_when_engine_not_found(self, client_both):
+        """Returns 404 when engine not found"""
+        response = client_both.post(
+            "/api/v1/tts/synthesize",
+            params={"text": "Hello", "engine": "nonexistent"},
+        )
+
+        assert response.status_code == 404
+
+    def test_returns_400_for_invalid_json_params(self, client_both):
+        """Returns 400 for invalid JSON in engine_params"""
+        response = client_both.post(
+            "/api/v1/tts/synthesize",
+            params={
+                "text": "Hello",
+                "engine": "default",
+                "engine_params": "invalid json{",
+            },
+        )
+
+        assert response.status_code == 400
+        assert "Invalid engine_params JSON" in response.json()["detail"]
+
+    def test_passes_valid_engine_params(self, client_both, mock_tts_engine):
+        """Passes valid engine_params to engine"""
+        response = client_both.post(
+            "/api/v1/tts/synthesize",
+            params={
+                "text": "Hello",
+                "engine": "default",
+                "engine_params": '{"pitch": 1.5}',
+            },
+        )
+
+        assert response.status_code == 200
+        # Verify engine was called with params
+        mock_tts_engine.synthesize.assert_called_once()
+        call_kwargs = mock_tts_engine.synthesize.call_args.kwargs
+        assert call_kwargs.get("pitch") == 1.5
+
+    def test_passes_voice_and_speed_params(self, client_both, mock_tts_engine):
+        """Passes voice and speed params to engine"""
+        response = client_both.post(
+            "/api/v1/tts/synthesize",
+            params={
+                "text": "Hello",
+                "engine": "default",
+                "voice": "voice2",
+                "speed": 1.5,
+            },
+        )
+
+        assert response.status_code == 200
+        call_kwargs = mock_tts_engine.synthesize.call_args.kwargs
+        assert call_kwargs.get("voice") == "voice2"
+        assert call_kwargs.get("speed") == 1.5
+
+
+class TestSynthesizeStreamEndpoint:
+    """POST /synthesize/stream tests"""
+
+    def test_returns_200_with_event_stream(self, client_both):
+        """Returns 200 with event-stream content type"""
         response = client_both.post(
             "/api/v1/tts/synthesize/stream",
             params={"text": "Hello", "engine": "default"},
         )
 
-        assert response.status_code == 501
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers["content-type"]
 
-    def test_endpoints_exist(self, client_both):
-        """TTS endpoints exist (not 404)"""
-        r1 = client_both.post(
-            "/api/v1/tts/synthesize", params={"text": "x", "engine": "default"}
-        )
-        r2 = client_both.post(
-            "/api/v1/tts/synthesize/stream", params={"text": "x", "engine": "default"}
-        )
-
-        assert r1.status_code != 404
-        assert r2.status_code != 404
-
-    def test_synthesize_with_minimal_request(self, client_both):
-        """Synthesize with minimal request"""
+    def test_streams_chunks_and_complete(self, client_both):
+        """Streams chunk events and complete event"""
         response = client_both.post(
-            "/api/v1/tts/synthesize",
-            params={"text": "Test", "engine": "default"},
+            "/api/v1/tts/synthesize/stream",
+            params={"text": "Hello", "engine": "default"},
         )
 
-        assert response.status_code == 501
+        # Parse SSE events
+        events = []
+        current_event = None
+        for line in response.text.split("\n"):
+            if line.startswith("event:"):
+                current_event = line.split(":", 1)[1].strip()
+            elif line.startswith("data:") and current_event:
+                events.append(current_event)
+                current_event = None
 
-    def test_synthesize_missing_fields_returns_422(self, client_both):
-        """Missing required fields returns 422"""
+        assert "chunk" in events
+        assert "complete" in events
+
+    def test_returns_400_for_invalid_json_params(self, client_both):
+        """Returns 400 for invalid JSON in engine_params"""
         response = client_both.post(
-            "/api/v1/tts/synthesize",
-            params={},
+            "/api/v1/tts/synthesize/stream",
+            params={
+                "text": "Hello",
+                "engine": "default",
+                "engine_params": "bad json",
+            },
         )
 
-        assert response.status_code == 422
+        # Note: EventSourceResponse might handle errors differently,
+        # but usually synchronous validation runs before streaming starts
+        assert response.status_code == 400
+
+    def test_passes_engine_params_stream(self, client_both, mock_tts_engine):
+        """Passes engine_params to engine in stream mode"""
+        response = client_both.post(
+            "/api/v1/tts/synthesize/stream",
+            params={
+                "text": "Hello",
+                "engine": "default",
+                "engine_params": '{"style": "happy"}',
+            },
+        )
+
+        assert response.status_code == 200
+        # Wait for generator to start (TestClient handles this)
+        # Check call args
+        mock_tts_engine.synthesize_stream.assert_called_once()
+        call_kwargs = mock_tts_engine.synthesize_stream.call_args.kwargs
+        assert call_kwargs.get("style") == "happy"
