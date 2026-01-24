@@ -248,7 +248,7 @@ Batch synthesis - convert text to speech audio.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `engine` | string | Yes | Engine name (e.g., "coqui") |
+| `engine` | string | Yes | Engine name (e.g., "voxcpm") |
 | `text` | string | Yes | Text to synthesize |
 | `voice` | string | No | Voice name/ID to use |
 | `speed` | float | No | Speech speed multiplier (0 < speed <= 3.0, default: 1.0) |
@@ -257,7 +257,7 @@ Batch synthesis - convert text to speech audio.
 **Example:**
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=coqui&text=Hello%20world&voice=en-US-1&speed=1.0"
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm&text=Hello%20world"
 ```
 
 **Response:**
@@ -307,17 +307,15 @@ data: {"audio_data": "<base64-full-audio>", "sample_rate": 22050, "duration_seco
 **Example:**
 
 ```bash
-curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=coqui&text=Hello%20world"
+curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=voxcpm&text=Hello%20world"
 ```
 
 **JavaScript Client Example:**
 
 ```javascript
 const params = new URLSearchParams({
-  engine: 'coqui',
-  text: 'Hello, how are you today?',
-  voice: 'en-US-1',
-  speed: '1.0'
+  engine: 'voxcpm',
+  text: 'Hello, how are you today?'
 });
 
 const eventSource = new EventSource(
@@ -493,6 +491,27 @@ Pass these via `engine_params` query parameter as JSON string.
 ```bash
 curl -X POST "http://localhost:8000/api/v1/stt/transcribe?engine=whisper&engine_params={\"beam_size\":3,\"vad_filter\":true}" \
   -F "file=@audio.wav"
+```
+
+### VoxCPM (Text-to-Speech)
+
+Pass these via `engine_params` query parameter as JSON string.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `prompt_wav_path` | string | null | Path to reference audio for zero-shot voice cloning |
+| `prompt_text` | string | null | Transcript of the reference audio (required with prompt_wav_path) |
+
+**Basic Example:**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm&text=Hello%20world"
+```
+
+**Voice Cloning Example:**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm&text=Hello%20world&engine_params={\"prompt_wav_path\":\"/path/to/reference.wav\",\"prompt_text\":\"This%20is%20the%20reference%20transcript\"}"
 ```
 
 ---
