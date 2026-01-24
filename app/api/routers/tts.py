@@ -51,17 +51,22 @@ async def synthesize_text(
 
     temp_file = None
     try:
+        reference_audio_path = None
         if reference_audio:
             suffix = Path(reference_audio.filename or ".wav").suffix or ".wav"
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(await reference_audio.read())
                 temp_file = tmp
-            kwargs["prompt_wav_path"] = temp_file.name
+            reference_audio_path = temp_file.name
 
-        if reference_text:
-            kwargs["prompt_text"] = reference_text
-
-        result = await tts_engine.synthesize(text, voice=voice, speed=speed, **kwargs)
+        result = await tts_engine.synthesize(
+            text,
+            voice=voice,
+            speed=speed,
+            reference_audio_path=reference_audio_path,
+            reference_text=reference_text,
+            **kwargs,
+        )
         return result
 
     finally:
@@ -108,20 +113,23 @@ async def synthesize_text_stream(
             raise HTTPException(400, "Invalid engine_params JSON") from e
 
     temp_file = None
+    reference_audio_path = None
     if reference_audio:
         suffix = Path(reference_audio.filename or ".wav").suffix or ".wav"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(await reference_audio.read())
             temp_file = tmp
-        kwargs["prompt_wav_path"] = temp_file.name
-
-    if reference_text:
-        kwargs["prompt_text"] = reference_text
+        reference_audio_path = temp_file.name
 
     async def event_generator():
         try:
             async for result in tts_engine.synthesize_stream(
-                text, voice=voice, speed=speed, **kwargs
+                text,
+                voice=voice,
+                speed=speed,
+                reference_audio_path=reference_audio_path,
+                reference_text=reference_text,
+                **kwargs,
             ):
                 if isinstance(result, TTSChunk):
                     yield {"event": "chunk", "data": result.model_dump_json()}

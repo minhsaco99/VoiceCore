@@ -72,6 +72,8 @@ class VoxCPMEngine(BaseTTSEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
+        reference_audio_path: str | None = None,
+        reference_text: str | None = None,
         **kwargs,
     ) -> TTSResponse:
         """
@@ -79,11 +81,10 @@ class VoxCPMEngine(BaseTTSEngine):
 
         Args:
             text: Text to synthesize
-            voice: Not used (voice cloning via kwargs instead)
+            voice: Not used (voice cloning via reference_audio_path instead)
             speed: Not directly supported by VoxCPM
-            **kwargs: Additional parameters:
-                - prompt_wav_path: Path to reference audio for voice cloning
-                - prompt_text: Transcript of reference audio
+            reference_audio_path: Path to reference audio for voice cloning
+            reference_text: Transcript of reference audio
 
         Returns:
             TTSResponse with audio data and metrics
@@ -95,23 +96,21 @@ class VoxCPMEngine(BaseTTSEngine):
         if self._model is None:
             raise EngineNotReadyError("VoxCPM model not loaded")
 
-        # Extract voice cloning parameters
-        prompt_wav_path = kwargs.get("prompt_wav_path")
-        prompt_text = kwargs.get("prompt_text")
-
-        # Validate prompt audio if provided
-        if prompt_wav_path is not None:
-            prompt_path = Path(prompt_wav_path)
+        # Validate reference audio if provided
+        if reference_audio_path is not None:
+            prompt_path = Path(reference_audio_path)
             if not prompt_path.exists():
-                raise SynthesisError(f"Prompt audio file not found: {prompt_wav_path}")
+                raise SynthesisError(
+                    f"Reference audio file not found: {reference_audio_path}"
+                )
 
         processing_start = time.time()
         try:
             # Generate audio using VoxCPM
             wav = self._model.generate(
                 text=text,
-                prompt_wav_path=prompt_wav_path,
-                prompt_text=prompt_text,
+                prompt_wav_path=reference_audio_path,
+                prompt_text=reference_text,
                 cfg_value=self.voxcpm_config.cfg_value,
                 inference_timesteps=self.voxcpm_config.inference_timesteps,
                 normalize=self.voxcpm_config.normalize,
@@ -164,6 +163,10 @@ class VoxCPMEngine(BaseTTSEngine):
     async def synthesize_stream(
         self,
         text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        reference_audio_path: str | None = None,
+        reference_text: str | None = None,
         **kwargs,
     ) -> AsyncIterator[TTSChunk | TTSResponse]:
         """
@@ -171,7 +174,10 @@ class VoxCPMEngine(BaseTTSEngine):
 
         Args:
             text: Text to synthesize
-            **kwargs: Additional parameters (same as synthesize)
+            voice: Not used (voice cloning via reference_audio_path instead)
+            speed: Not directly supported by VoxCPM
+            reference_audio_path: Path to reference audio for voice cloning
+            reference_text: Transcript of reference audio
 
         Yields:
             TTSChunk: Audio chunks with progressive generation
@@ -187,22 +193,20 @@ class VoxCPMEngine(BaseTTSEngine):
         if self._model is None:
             raise EngineNotReadyError("VoxCPM model not loaded")
 
-        # Extract voice cloning parameters
-        prompt_wav_path = kwargs.get("prompt_wav_path")
-        prompt_text = kwargs.get("prompt_text")
-
-        # Validate prompt audio if provided
-        if prompt_wav_path is not None:
-            prompt_path = Path(prompt_wav_path)
+        # Validate reference audio if provided
+        if reference_audio_path is not None:
+            prompt_path = Path(reference_audio_path)
             if not prompt_path.exists():
-                raise SynthesisError(f"Prompt audio file not found: {prompt_wav_path}")
+                raise SynthesisError(
+                    f"Reference audio file not found: {reference_audio_path}"
+                )
 
         try:
             # Stream audio chunks
             for chunk in self._model.generate_streaming(
                 text=text,
-                prompt_wav_path=prompt_wav_path,
-                prompt_text=prompt_text,
+                prompt_wav_path=reference_audio_path,
+                prompt_text=reference_text,
                 cfg_value=self.voxcpm_config.cfg_value,
                 inference_timesteps=self.voxcpm_config.inference_timesteps,
                 normalize=self.voxcpm_config.normalize,
