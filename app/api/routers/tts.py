@@ -40,13 +40,7 @@ async def synthesize_text(
 
     result = await tts_engine.synthesize(text, voice=voice, speed=speed, **kwargs)
 
-    return TTSResponse(
-        audio_data=result.audio_data,
-        sample_rate=result.sample_rate,
-        duration_seconds=result.duration_seconds,
-        format=result.format,
-        performance_metrics=result.performance_metrics,
-    )
+    return result
 
 
 @router.post("/synthesize/stream")
