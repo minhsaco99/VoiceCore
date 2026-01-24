@@ -15,6 +15,7 @@ from app.engines.tts.voxcpm.config import VoxCPMConfig
 from app.exceptions import EngineNotReadyError, SynthesisError
 from app.models.engine import TTSChunk, TTSResponse
 from app.models.metrics import TTSPerformanceMetrics
+from app.utils.audio import AudioProcessor
 
 
 class VoxCPMEngine(BaseTTSEngine):
@@ -35,6 +36,7 @@ class VoxCPMEngine(BaseTTSEngine):
         super().__init__(config)
         self.voxcpm_config = config
         self._model = None
+        self.audio_processor = AudioProcessor()
 
     async def _initialize(self) -> None:
         """
@@ -123,7 +125,7 @@ class VoxCPMEngine(BaseTTSEngine):
             sample_rate = self._model.tts_model.sample_rate
 
             # Convert numpy array to bytes (16-bit PCM WAV)
-            audio_bytes = self._numpy_to_wav_bytes(wav, sample_rate)
+            audio_bytes = self.audio_processor.numpy_to_wav_bytes(wav, sample_rate)
 
             # Calculate duration
             duration_seconds = len(wav) / sample_rate
@@ -221,7 +223,9 @@ class VoxCPMEngine(BaseTTSEngine):
                 sample_rate = self._model.tts_model.sample_rate
 
                 # Convert chunk to bytes
-                chunk_bytes = self._numpy_to_wav_bytes(chunk, sample_rate)
+                chunk_bytes = self.audio_processor.numpy_to_wav_bytes(
+                    chunk, sample_rate
+                )
 
                 chunk_latency_ms = (chunk_time - start_time) * 1000
 
@@ -240,7 +244,9 @@ class VoxCPMEngine(BaseTTSEngine):
             if all_audio_chunks:
                 full_audio = np.concatenate(all_audio_chunks)
                 sample_rate = self._model.tts_model.sample_rate
-                audio_bytes = self._numpy_to_wav_bytes(full_audio, sample_rate)
+                audio_bytes = self.audio_processor.numpy_to_wav_bytes(
+                    full_audio, sample_rate
+                )
                 duration_seconds = len(full_audio) / sample_rate
             else:
                 audio_bytes = b""
@@ -294,32 +300,3 @@ class VoxCPMEngine(BaseTTSEngine):
     def engine_name(self) -> str:
         """Engine name for identification."""
         return "voxcpm"
-
-    @staticmethod
-    def _numpy_to_wav_bytes(audio: np.ndarray, sample_rate: int) -> bytes:
-        """
-        Convert numpy audio array to WAV bytes.
-
-        Args:
-            audio: Audio samples as numpy array (float32, range [-1, 1])
-            sample_rate: Sample rate in Hz
-
-        Returns:
-            WAV file bytes
-        """
-        import io
-        import wave
-
-        # Normalize and convert to 16-bit PCM
-        audio = np.clip(audio, -1.0, 1.0)
-        audio_int16 = (audio * 32767).astype(np.int16)
-
-        # Write to WAV format
-        buffer = io.BytesIO()
-        with wave.open(buffer, "wb") as wav_file:
-            wav_file.setnchannels(1)  # Mono
-            wav_file.setsampwidth(2)  # 16-bit
-            wav_file.setframerate(sample_rate)
-            wav_file.writeframes(audio_int16.tobytes())
-
-        return buffer.getvalue()

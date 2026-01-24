@@ -214,3 +214,53 @@ class TestAudioProcessorDuration:
 
         with pytest.raises(InvalidAudioError):
             processor.get_duration_ms(np.array([1, 2, 3]), -1000)
+
+
+class TestAudioProcessorNumpyToWavBytes:
+    """Test AudioProcessor.numpy_to_wav_bytes() method"""
+
+    def test_numpy_to_wav_bytes(self):
+        """Should convert numpy array to valid WAV bytes"""
+        from app.utils.audio import AudioProcessor
+
+        processor = AudioProcessor()
+        sample_rate = 16000
+        # Create 1 second of silence
+        audio = np.zeros(sample_rate, dtype=np.float32)
+
+        wav_bytes = processor.numpy_to_wav_bytes(audio, sample_rate)
+
+        assert isinstance(wav_bytes, bytes)
+        assert len(wav_bytes) > 0
+        assert wav_bytes.startswith(b"RIFF")  # WAV header check
+
+        # Verify content using soundfile
+        import soundfile as sf
+
+        buffer = io.BytesIO(wav_bytes)
+        audio_read, sr_read = sf.read(buffer)
+
+        assert sr_read == sample_rate
+        assert len(audio_read) == len(audio)
+        # Should be almost equal (precision loss in 16-bit conversion)
+        np.testing.assert_allclose(audio_read, audio, atol=1e-4)
+
+    def test_numpy_to_wav_bytes_clipping(self):
+        """Should handle audio values outside [-1, 1] range"""
+        from app.utils.audio import AudioProcessor
+
+        processor = AudioProcessor()
+        sample_rate = 16000
+        # Create audio with values exceeding range
+        audio = np.array([2.0, -2.0, 0.5], dtype=np.float32)
+
+        wav_bytes = processor.numpy_to_wav_bytes(audio, sample_rate)
+
+        # Verify reading back works and is clipped
+        import soundfile as sf
+
+        buffer = io.BytesIO(wav_bytes)
+        audio_read, _ = sf.read(buffer)
+
+        # Values should be clipped to near 1.0 and -1.0
+        assert np.all(np.abs(audio_read) <= 1.0)
