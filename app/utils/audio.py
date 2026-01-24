@@ -2,6 +2,10 @@
 
 import io
 import pathlib
+import tempfile
+from collections.abc import Generator
+from contextlib import contextmanager
+from pathlib import Path
 
 import librosa
 import numpy as np
@@ -9,6 +13,39 @@ import soundfile as sf
 
 from app.exceptions import InvalidAudioError, UnsupportedFormatError
 from app.types.audio import AudioInput
+
+
+@contextmanager
+def temp_audio_file(
+    audio_bytes: bytes | None, suffix: str = ".wav"
+) -> Generator[str | None]:
+    """
+    Context manager that saves audio bytes to a temp file and cleans up after use.
+
+    Args:
+        audio_bytes: Audio data as bytes, or None (yields None without creating file)
+        suffix: File extension (default: ".wav")
+
+    Yields:
+        Path to the temporary file, or None if audio_bytes is None
+
+    Example:
+        with temp_audio_file(audio_bytes) as temp_path:
+            model.generate(prompt_wav_path=temp_path)
+        # temp file is automatically deleted
+    """
+    if audio_bytes is None:
+        yield None
+        return
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+        temp_file.write(audio_bytes)
+        temp_path = temp_file.name
+
+    try:
+        yield temp_path
+    finally:
+        Path(temp_path).unlink(missing_ok=True)
 
 
 class AudioProcessor:

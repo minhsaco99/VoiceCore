@@ -6,7 +6,6 @@ Tokenizer-free TTS engine with voice cloning support using VoxCPM from OpenBMB.
 
 import time
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import numpy as np
 
@@ -15,7 +14,7 @@ from app.engines.tts.voxcpm.config import VoxCPMConfig
 from app.exceptions import EngineNotReadyError, SynthesisError
 from app.models.engine import TTSChunk, TTSResponse
 from app.models.metrics import TTSPerformanceMetrics
-from app.utils.audio import AudioProcessor
+from app.utils.audio import AudioProcessor, temp_audio_file
 
 
 class VoxCPMEngine(BaseTTSEngine):
@@ -72,7 +71,7 @@ class VoxCPMEngine(BaseTTSEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
-        reference_audio_path: str | None = None,
+        reference_audio: bytes | None = None,
         reference_text: str | None = None,
         **kwargs,
     ) -> TTSResponse:
@@ -81,9 +80,9 @@ class VoxCPMEngine(BaseTTSEngine):
 
         Args:
             text: Text to synthesize
-            voice: Not used (voice cloning via reference_audio_path instead)
+            voice: Not used (voice cloning via reference_audio instead)
             speed: Not directly supported by VoxCPM
-            reference_audio_path: Path to reference audio for voice cloning
+            reference_audio: Reference audio bytes for voice cloning
             reference_text: Transcript of reference audio
 
         Returns:
@@ -96,41 +95,36 @@ class VoxCPMEngine(BaseTTSEngine):
         if self._model is None:
             raise EngineNotReadyError("VoxCPM model not loaded")
 
-        # Validate reference audio if provided
-        if reference_audio_path is not None:
-            prompt_path = Path(reference_audio_path)
-            if not prompt_path.exists():
-                raise SynthesisError(
-                    f"Reference audio file not found: {reference_audio_path}"
+        with temp_audio_file(reference_audio) as prompt_wav_path:
+            processing_start = time.time()
+            try:
+                # Generate audio using VoxCPM
+                wav = self._model.generate(
+                    text=text,
+                    prompt_wav_path=prompt_wav_path,
+                    prompt_text=reference_text,
+                    cfg_value=self.voxcpm_config.cfg_value,
+                    inference_timesteps=self.voxcpm_config.inference_timesteps,
+                    normalize=self.voxcpm_config.normalize,
+                    denoise=self.voxcpm_config.denoise,
+                    retry_badcase=self.voxcpm_config.retry_badcase,
+                    retry_badcase_max_times=self.voxcpm_config.retry_badcase_max_times,
+                    retry_badcase_ratio_threshold=self.voxcpm_config.retry_badcase_ratio_threshold,
                 )
 
-        processing_start = time.time()
-        try:
-            # Generate audio using VoxCPM
-            wav = self._model.generate(
-                text=text,
-                prompt_wav_path=reference_audio_path,
-                prompt_text=reference_text,
-                cfg_value=self.voxcpm_config.cfg_value,
-                inference_timesteps=self.voxcpm_config.inference_timesteps,
-                normalize=self.voxcpm_config.normalize,
-                denoise=self.voxcpm_config.denoise,
-                retry_badcase=self.voxcpm_config.retry_badcase,
-                retry_badcase_max_times=self.voxcpm_config.retry_badcase_max_times,
-                retry_badcase_ratio_threshold=self.voxcpm_config.retry_badcase_ratio_threshold,
-            )
+                # Get sample rate from model
+                sample_rate = self._model.tts_model.sample_rate
 
-            # Get sample rate from model
-            sample_rate = self._model.tts_model.sample_rate
+                # Convert numpy array to bytes (16-bit PCM WAV)
+                audio_bytes = self.audio_processor.numpy_to_wav_bytes(wav, sample_rate)
 
-            # Convert numpy array to bytes (16-bit PCM WAV)
-            audio_bytes = self.audio_processor.numpy_to_wav_bytes(wav, sample_rate)
+                # Calculate duration
+                duration_seconds = len(wav) / sample_rate
 
-            # Calculate duration
-            duration_seconds = len(wav) / sample_rate
-
-        except Exception as e:
-            raise SynthesisError(f"VoxCPM synthesis failed: {e}") from e
+            except Exception as e:
+                if isinstance(e, (EngineNotReadyError, SynthesisError)):
+                    raise
+                raise SynthesisError(f"VoxCPM synthesis failed: {e}") from e
 
         processing_end = time.time()
         end_time = time.time()
@@ -165,7 +159,7 @@ class VoxCPMEngine(BaseTTSEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
-        reference_audio_path: str | None = None,
+        reference_audio: bytes | None = None,
         reference_text: str | None = None,
         **kwargs,
     ) -> AsyncIterator[TTSChunk | TTSResponse]:
@@ -174,9 +168,9 @@ class VoxCPMEngine(BaseTTSEngine):
 
         Args:
             text: Text to synthesize
-            voice: Not used (voice cloning via reference_audio_path instead)
+            voice: Not used (voice cloning via reference_audio instead)
             speed: Not directly supported by VoxCPM
-            reference_audio_path: Path to reference audio for voice cloning
+            reference_audio: Reference audio bytes for voice cloning
             reference_text: Transcript of reference audio
 
         Yields:
@@ -193,102 +187,95 @@ class VoxCPMEngine(BaseTTSEngine):
         if self._model is None:
             raise EngineNotReadyError("VoxCPM model not loaded")
 
-        # Validate reference audio if provided
-        if reference_audio_path is not None:
-            prompt_path = Path(reference_audio_path)
-            if not prompt_path.exists():
-                raise SynthesisError(
-                    f"Reference audio file not found: {reference_audio_path}"
+        with temp_audio_file(reference_audio) as prompt_wav_path:
+            try:
+                # Stream audio chunks
+                for chunk in self._model.generate_streaming(
+                    text=text,
+                    prompt_wav_path=prompt_wav_path,
+                    prompt_text=reference_text,
+                    cfg_value=self.voxcpm_config.cfg_value,
+                    inference_timesteps=self.voxcpm_config.inference_timesteps,
+                    normalize=self.voxcpm_config.normalize,
+                    denoise=self.voxcpm_config.denoise,
+                    retry_badcase=self.voxcpm_config.retry_badcase,
+                    retry_badcase_max_times=self.voxcpm_config.retry_badcase_max_times,
+                    retry_badcase_ratio_threshold=self.voxcpm_config.retry_badcase_ratio_threshold,
+                ):
+                    chunk_time = time.time()
+
+                    if first_chunk_time is None:
+                        first_chunk_time = chunk_time
+
+                    # Store raw numpy chunk for final concatenation
+                    all_audio_chunks.append(chunk)
+
+                    # Get sample rate from model
+                    sample_rate = self._model.tts_model.sample_rate
+
+                    # Convert chunk to bytes
+                    chunk_bytes = self.audio_processor.numpy_to_wav_bytes(
+                        chunk, sample_rate
+                    )
+
+                    chunk_latency_ms = (chunk_time - start_time) * 1000
+
+                    yield TTSChunk(
+                        audio_data=chunk_bytes,
+                        sequence_number=total_chunks,
+                        chunk_latency_ms=chunk_latency_ms,
+                    )
+
+                    total_chunks += 1
+
+                # Final response
+                end_time = time.time()
+
+                # Concatenate all chunks
+                if all_audio_chunks:
+                    full_audio = np.concatenate(all_audio_chunks)
+                    sample_rate = self._model.tts_model.sample_rate
+                    audio_bytes = self.audio_processor.numpy_to_wav_bytes(
+                        full_audio, sample_rate
+                    )
+                    duration_seconds = len(full_audio) / sample_rate
+                else:
+                    audio_bytes = b""
+                    sample_rate = 16000
+                    duration_seconds = 0.0
+
+                total_duration_ms = (end_time - start_time) * 1000
+                time_to_first_byte_ms = (
+                    (first_chunk_time - start_time) * 1000 if first_chunk_time else None
                 )
 
-        try:
-            # Stream audio chunks
-            for chunk in self._model.generate_streaming(
-                text=text,
-                prompt_wav_path=reference_audio_path,
-                prompt_text=reference_text,
-                cfg_value=self.voxcpm_config.cfg_value,
-                inference_timesteps=self.voxcpm_config.inference_timesteps,
-                normalize=self.voxcpm_config.normalize,
-                denoise=self.voxcpm_config.denoise,
-                retry_badcase=self.voxcpm_config.retry_badcase,
-                retry_badcase_max_times=self.voxcpm_config.retry_badcase_max_times,
-                retry_badcase_ratio_threshold=self.voxcpm_config.retry_badcase_ratio_threshold,
-            ):
-                chunk_time = time.time()
-
-                if first_chunk_time is None:
-                    first_chunk_time = chunk_time
-
-                # Store raw numpy chunk for final concatenation
-                all_audio_chunks.append(chunk)
-
-                # Get sample rate from model
-                sample_rate = self._model.tts_model.sample_rate
-
-                # Convert chunk to bytes
-                chunk_bytes = self.audio_processor.numpy_to_wav_bytes(
-                    chunk, sample_rate
+                metrics = TTSPerformanceMetrics(
+                    latency_ms=total_duration_ms,
+                    processing_time_ms=total_duration_ms,
+                    audio_duration_ms=duration_seconds * 1000,
+                    real_time_factor=(
+                        total_duration_ms / (duration_seconds * 1000)
+                        if duration_seconds > 0
+                        else None
+                    ),
+                    characters_processed=len(text),
+                    time_to_first_byte_ms=time_to_first_byte_ms,
+                    total_stream_duration_ms=total_duration_ms,
+                    total_chunks=total_chunks,
                 )
 
-                chunk_latency_ms = (chunk_time - start_time) * 1000
-
-                yield TTSChunk(
-                    audio_data=chunk_bytes,
-                    sequence_number=total_chunks,
-                    chunk_latency_ms=chunk_latency_ms,
+                yield TTSResponse(
+                    audio_data=audio_bytes,
+                    sample_rate=sample_rate,
+                    duration_seconds=duration_seconds,
+                    format="wav",
+                    performance_metrics=metrics,
                 )
 
-                total_chunks += 1
-
-            # Final response
-            end_time = time.time()
-
-            # Concatenate all chunks
-            if all_audio_chunks:
-                full_audio = np.concatenate(all_audio_chunks)
-                sample_rate = self._model.tts_model.sample_rate
-                audio_bytes = self.audio_processor.numpy_to_wav_bytes(
-                    full_audio, sample_rate
-                )
-                duration_seconds = len(full_audio) / sample_rate
-            else:
-                audio_bytes = b""
-                sample_rate = 16000
-                duration_seconds = 0.0
-
-            total_duration_ms = (end_time - start_time) * 1000
-            time_to_first_byte_ms = (
-                (first_chunk_time - start_time) * 1000 if first_chunk_time else None
-            )
-
-            metrics = TTSPerformanceMetrics(
-                latency_ms=total_duration_ms,
-                processing_time_ms=total_duration_ms,
-                audio_duration_ms=duration_seconds * 1000,
-                real_time_factor=(
-                    total_duration_ms / (duration_seconds * 1000)
-                    if duration_seconds > 0
-                    else None
-                ),
-                characters_processed=len(text),
-                time_to_first_byte_ms=time_to_first_byte_ms,
-                total_stream_duration_ms=total_duration_ms,
-                total_chunks=total_chunks,
-            )
-
-            yield TTSResponse(
-                audio_data=audio_bytes,
-                sample_rate=sample_rate,
-                duration_seconds=duration_seconds,
-                format="wav",
-                performance_metrics=metrics,
-            )
-
-        except Exception as e:
-            if isinstance(e, (EngineNotReadyError, SynthesisError)):
-                raise
-            raise SynthesisError(f"VoxCPM streaming failed: {e}") from e
+            except Exception as e:
+                if isinstance(e, (EngineNotReadyError, SynthesisError)):
+                    raise
+                raise SynthesisError(f"VoxCPM streaming failed: {e}") from e
 
     @property
     def supported_voices(self) -> list[str]:

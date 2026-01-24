@@ -1,6 +1,4 @@
 import json
-import tempfile
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sse_starlette.sse import EventSourceResponse
@@ -49,29 +47,20 @@ async def synthesize_text(
         except json.JSONDecodeError as e:
             raise HTTPException(400, "Invalid engine_params JSON") from e
 
-    temp_file = None
-    try:
-        reference_audio_path = None
-        if reference_audio:
-            suffix = Path(reference_audio.filename or ".wav").suffix or ".wav"
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(await reference_audio.read())
-                temp_file = tmp
-            reference_audio_path = temp_file.name
+    # Read reference audio bytes if provided
+    reference_audio_bytes = None
+    if reference_audio:
+        reference_audio_bytes = await reference_audio.read()
 
-        result = await tts_engine.synthesize(
-            text,
-            voice=voice,
-            speed=speed,
-            reference_audio_path=reference_audio_path,
-            reference_text=reference_text,
-            **kwargs,
-        )
-        return result
-
-    finally:
-        if temp_file:
-            Path(temp_file.name).unlink(missing_ok=True)
+    result = await tts_engine.synthesize(
+        text,
+        voice=voice,
+        speed=speed,
+        reference_audio=reference_audio_bytes,
+        reference_text=reference_text,
+        **kwargs,
+    )
+    return result
 
 
 @router.post("/synthesize/stream")
@@ -112,31 +101,23 @@ async def synthesize_text_stream(
         except json.JSONDecodeError as e:
             raise HTTPException(400, "Invalid engine_params JSON") from e
 
-    temp_file = None
-    reference_audio_path = None
+    # Read reference audio bytes if provided
+    reference_audio_bytes = None
     if reference_audio:
-        suffix = Path(reference_audio.filename or ".wav").suffix or ".wav"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(await reference_audio.read())
-            temp_file = tmp
-        reference_audio_path = temp_file.name
+        reference_audio_bytes = await reference_audio.read()
 
     async def event_generator():
-        try:
-            async for result in tts_engine.synthesize_stream(
-                text,
-                voice=voice,
-                speed=speed,
-                reference_audio_path=reference_audio_path,
-                reference_text=reference_text,
-                **kwargs,
-            ):
-                if isinstance(result, TTSChunk):
-                    yield {"event": "chunk", "data": result.model_dump_json()}
-                elif isinstance(result, TTSResponse):
-                    yield {"event": "complete", "data": result.model_dump_json()}
-        finally:
-            if temp_file:
-                Path(temp_file.name).unlink(missing_ok=True)
+        async for result in tts_engine.synthesize_stream(
+            text,
+            voice=voice,
+            speed=speed,
+            reference_audio=reference_audio_bytes,
+            reference_text=reference_text,
+            **kwargs,
+        ):
+            if isinstance(result, TTSChunk):
+                yield {"event": "chunk", "data": result.model_dump_json()}
+            elif isinstance(result, TTSResponse):
+                yield {"event": "complete", "data": result.model_dump_json()}
 
     return EventSourceResponse(event_generator())

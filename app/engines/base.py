@@ -198,7 +198,7 @@ class BaseTTSEngine(BaseEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
-        reference_audio_path: str | None = None,
+        reference_audio: bytes | None = None,
         reference_text: str | None = None,
         **kwargs,
     ) -> TTSResponse:
@@ -209,7 +209,7 @@ class BaseTTSEngine(BaseEngine):
             text: Text to synthesize
             voice: Optional voice name (overrides config default)
             speed: Speech speed (1.0 = normal, overrides config default)
-            reference_audio_path: Path to reference audio for voice cloning
+            reference_audio: Reference audio bytes for voice cloning
             reference_text: Transcript of reference audio for voice cloning
             **kwargs: Additional engine-specific parameters (passed via engine_params)
 
@@ -224,7 +224,7 @@ class BaseTTSEngine(BaseEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
-        reference_audio_path: str | None = None,
+        reference_audio: bytes | None = None,
         reference_text: str | None = None,
         **kwargs,
     ) -> AsyncIterator[TTSChunk | TTSResponse]:
@@ -238,7 +238,7 @@ class BaseTTSEngine(BaseEngine):
             text: Text to synthesize
             voice: Optional voice name (overrides config default)
             speed: Speech speed (1.0 = normal, overrides config default)
-            reference_audio_path: Path to reference audio for voice cloning
+            reference_audio: Reference audio bytes for voice cloning
             reference_text: Transcript of reference audio for voice cloning
             **kwargs: Additional engine-specific parameters (passed via engine_params)
 
