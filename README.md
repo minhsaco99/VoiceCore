@@ -146,13 +146,13 @@ curl -N -X POST "http://localhost:8000/api/v1/stt/transcribe/stream?engine=whisp
 **Batch Synthesis**
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=coqui&text=Hello%20world&voice=en-US-1&speed=1.0"
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm&text=Hello%20world"
 ```
 
 **Streaming Synthesis**
 
 ```bash
-curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=coqui&text=Hello%20world"
+curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=voxcpm&text=Hello%20world"
 ```
 
 ---
@@ -182,6 +182,7 @@ Detailed documentation is available in the `docs/` directory:
 
 | Engine | Backend | Status | Features |
 | :--- | :--- | :---: | :--- |
+| **VoxCPM** | `voxcpm` | ✅ Ready | Zero-shot voice cloning, streaming, 24kHz |
 | **Coqui TTS** | `TTS` | 🚧 Planned | High-quality open source voices |
 | **OpenAI TTS** | OpenAI API | 🚧 Planned | Natural sounding commercial voices |
 
