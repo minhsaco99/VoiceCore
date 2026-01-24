@@ -1,6 +1,8 @@
 import json
+import tempfile
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import get_tts_engine
@@ -12,10 +14,16 @@ router = APIRouter()
 
 @router.post("/synthesize", response_model=TTSResponse)
 async def synthesize_text(
-    text: str = Query(..., description="Text to synthesize"),
+    text: str = Form(..., description="Text to synthesize"),
+    reference_audio: UploadFile | None = File(
+        None, description="Reference audio for voice cloning"
+    ),
+    reference_text: str | None = Form(
+        None, description="Transcript of reference audio"
+    ),
+    engine_params: str | None = Form(None, description="JSON engine parameters"),
     voice: str | None = Query(None, description="Voice name/ID to use"),
     speed: float = Query(1.0, gt=0, le=3.0, description="Speech speed multiplier"),
-    engine_params: str | None = Query(None, description="JSON engine parameters"),
     tts_engine: BaseTTSEngine = Depends(get_tts_engine),
 ):
     """
@@ -23,9 +31,13 @@ async def synthesize_text(
 
     Query params:
     - engine: TTS engine name (required)
-    - text: Text to synthesize (required)
     - voice: Optional voice name/ID
     - speed: Speech speed multiplier (0 < speed <= 3.0)
+
+    Form params:
+    - text: Text to synthesize (required)
+    - reference_audio: Optional reference audio file for voice cloning
+    - reference_text: Optional transcript of reference audio
     - engine_params: Optional JSON engine parameters
 
     Returns complete audio (base64 encoded) with metrics.
@@ -37,17 +49,38 @@ async def synthesize_text(
         except json.JSONDecodeError as e:
             raise HTTPException(400, "Invalid engine_params JSON") from e
 
-    result = await tts_engine.synthesize(text, voice=voice, speed=speed, **kwargs)
+    temp_file = None
+    try:
+        if reference_audio:
+            suffix = Path(reference_audio.filename or ".wav").suffix or ".wav"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(await reference_audio.read())
+                temp_file = tmp
+            kwargs["prompt_wav_path"] = temp_file.name
 
-    return result
+        if reference_text:
+            kwargs["prompt_text"] = reference_text
+
+        result = await tts_engine.synthesize(text, voice=voice, speed=speed, **kwargs)
+        return result
+
+    finally:
+        if temp_file:
+            Path(temp_file.name).unlink(missing_ok=True)
 
 
 @router.post("/synthesize/stream")
 async def synthesize_text_stream(
-    text: str = Query(..., description="Text to synthesize"),
+    text: str = Form(..., description="Text to synthesize"),
+    reference_audio: UploadFile | None = File(
+        None, description="Reference audio for voice cloning"
+    ),
+    reference_text: str | None = Form(
+        None, description="Transcript of reference audio"
+    ),
+    engine_params: str | None = Form(None, description="JSON engine parameters"),
     voice: str | None = Query(None, description="Voice name/ID to use"),
     speed: float = Query(1.0, gt=0, le=3.0, description="Speech speed multiplier"),
-    engine_params: str | None = Query(None, description="JSON engine parameters"),
     tts_engine: BaseTTSEngine = Depends(get_tts_engine),
 ):
     """
@@ -55,9 +88,13 @@ async def synthesize_text_stream(
 
     Query params:
     - engine: TTS engine name (required)
-    - text: Text to synthesize (required)
     - voice: Optional voice name/ID
     - speed: Speech speed multiplier (0 < speed <= 3.0)
+
+    Form params:
+    - text: Text to synthesize (required)
+    - reference_audio: Optional reference audio file for voice cloning
+    - reference_text: Optional transcript of reference audio
     - engine_params: Optional JSON engine parameters
 
     Returns progressive audio chunks followed by final response.
@@ -70,13 +107,28 @@ async def synthesize_text_stream(
         except json.JSONDecodeError as e:
             raise HTTPException(400, "Invalid engine_params JSON") from e
 
+    temp_file = None
+    if reference_audio:
+        suffix = Path(reference_audio.filename or ".wav").suffix or ".wav"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await reference_audio.read())
+            temp_file = tmp
+        kwargs["prompt_wav_path"] = temp_file.name
+
+    if reference_text:
+        kwargs["prompt_text"] = reference_text
+
     async def event_generator():
-        async for result in tts_engine.synthesize_stream(
-            text, voice=voice, speed=speed, **kwargs
-        ):
-            if isinstance(result, TTSChunk):
-                yield {"event": "chunk", "data": result.model_dump_json()}
-            elif isinstance(result, TTSResponse):
-                yield {"event": "complete", "data": result.model_dump_json()}
+        try:
+            async for result in tts_engine.synthesize_stream(
+                text, voice=voice, speed=speed, **kwargs
+            ):
+                if isinstance(result, TTSChunk):
+                    yield {"event": "chunk", "data": result.model_dump_json()}
+                elif isinstance(result, TTSResponse):
+                    yield {"event": "complete", "data": result.model_dump_json()}
+        finally:
+            if temp_file:
+                Path(temp_file.name).unlink(missing_ok=True)
 
     return EventSourceResponse(event_generator())
