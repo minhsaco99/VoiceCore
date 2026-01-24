@@ -2,28 +2,16 @@ import base64
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import get_tts_engine
 from app.engines.base import BaseTTSEngine
 from app.models.engine import TTSChunk, TTSResponse
-from app.models.metrics import TTSPerformanceMetrics
 
 router = APIRouter()
 
 
-class TTSResponseModel(BaseModel):
-    """API response model with base64 encoded audio"""
-
-    audio_data: str  # base64 encoded
-    sample_rate: int
-    duration_seconds: float
-    format: str
-    performance_metrics: TTSPerformanceMetrics | None = None
-
-
-@router.post("/synthesize", response_model=TTSResponseModel)
+@router.post("/synthesize", response_model=TTSResponse)
 async def synthesize_text(
     text: str = Query(..., description="Text to synthesize"),
     voice: str | None = Query(None, description="Voice name/ID to use"),
@@ -52,11 +40,8 @@ async def synthesize_text(
 
     result = await tts_engine.synthesize(text, voice=voice, speed=speed, **kwargs)
 
-    # Convert audio bytes to base64 for JSON response
-    audio_base64 = base64.b64encode(result.audio_data).decode("utf-8")
-
-    return TTSResponseModel(
-        audio_data=audio_base64,
+    return TTSResponse(
+        audio_data=result.audio_data,
         sample_rate=result.sample_rate,
         duration_seconds=result.duration_seconds,
         format=result.format,
