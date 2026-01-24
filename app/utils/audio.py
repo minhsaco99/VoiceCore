@@ -105,3 +105,19 @@ class AudioProcessor:
 
         duration_seconds = len(audio) / sample_rate
         return duration_seconds * 1000.0
+
+    def numpy_to_wav_bytes(self, audio: np.ndarray, sample_rate: int) -> bytes:
+        """
+        Convert numpy audio array to WAV bytes using soundfile.
+
+        Args:
+            audio: Audio samples as numpy array
+            sample_rate: Sample rate in Hz
+
+        Returns:
+            WAV file bytes
+        """
+        buffer = io.BytesIO()
+        # soundfile handles clipping and conversion automatically
+        sf.write(buffer, audio, sample_rate, format="WAV", subtype="PCM_16")
+        return buffer.getvalue()

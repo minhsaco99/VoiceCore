@@ -7,9 +7,10 @@ Design:
 - STTPerformanceMetrics/TTSPerformanceMetrics: Extended with streaming-specific fields
 """
 
+import base64
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from app.models.metrics import (
     STTPerformanceMetrics,
@@ -82,6 +83,10 @@ class TTSChunk(BaseModel):
         None, description="Generation latency for this specific chunk"
     )
 
+    @field_serializer("audio_data")
+    def serialize_audio(self, audio_data: bytes, _info) -> str:
+        return base64.b64encode(audio_data).decode("utf-8")
+
 
 # =============================================================================
 # Full Response Models (Invoke mode - complete output with all metrics)
@@ -138,3 +143,7 @@ class TTSResponse(BaseModel):
     performance_metrics: TTSPerformanceMetrics | None = Field(
         None, description="Performance metrics"
     )
+
+    @field_serializer("audio_data")
+    def serialize_audio(self, audio_data: bytes, _info) -> str:
+        return base64.b64encode(audio_data).decode("utf-8")

@@ -15,7 +15,7 @@ from httpx import ASGITransport, AsyncClient
 from app.api.registry import EngineRegistry
 from app.api.routers import health, stt, tts
 from app.engines.base import BaseSTTEngine, BaseTTSEngine
-from app.models.engine import Segment, STTChunk, STTResponse
+from app.models.engine import Segment, STTChunk, STTResponse, TTSChunk, TTSResponse
 
 # ============================================================================
 # Generic Mock Engines (represents ANY engine implementation)
@@ -54,7 +54,26 @@ def mock_tts_engine():
     engine.is_ready.return_value = True
     engine.engine_name = "test-tts"
     engine.supported_voices = ["default", "voice2"]
-    engine.synthesize = AsyncMock(return_value=MagicMock(audio_data=b"audio"))
+
+    mock_response = TTSResponse(
+        audio_data=b"audio",
+        sample_rate=16000,
+        duration_seconds=1.0,
+        format="wav",
+    )
+    engine.synthesize = AsyncMock(return_value=mock_response)
+
+    async def mock_stream_generator(text, **kwargs):
+        yield TTSChunk(audio_data=b"chunk1", sequence_number=0)
+        yield TTSChunk(audio_data=b"chunk2", sequence_number=1)
+        yield mock_response
+
+    mock_stream = MagicMock()
+    mock_stream.__aiter__.side_effect = mock_stream_generator
+    # Make the mock callable and return the generator when called
+    mock_stream.side_effect = mock_stream_generator
+
+    engine.synthesize_stream = mock_stream
     return engine
 
 
