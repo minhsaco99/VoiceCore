@@ -83,6 +83,10 @@ class TTSChunk(BaseModel):
         None, description="Generation latency for this specific chunk"
     )
 
+    @field_serializer("audio_data")
+    def serialize_audio(self, audio_data: bytes, _info) -> str:
+        return base64.b64encode(audio_data).decode("utf-8")
+
 
 # =============================================================================
 # Full Response Models (Invoke mode - complete output with all metrics)

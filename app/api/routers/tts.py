@@ -1,4 +1,3 @@
-import base64
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -76,26 +75,8 @@ async def synthesize_text_stream(
             text, voice=voice, speed=speed, **kwargs
         ):
             if isinstance(result, TTSChunk):
-                # Convert chunk audio to base64
-                chunk_data = {
-                    "audio_data": base64.b64encode(result.audio_data).decode("utf-8"),
-                    "sequence_number": result.sequence_number,
-                    "chunk_latency_ms": result.chunk_latency_ms,
-                }
-                yield {"event": "chunk", "data": json.dumps(chunk_data)}
+                yield {"event": "chunk", "data": result.model_dump_json()}
             elif isinstance(result, TTSResponse):
-                # Convert final response audio to base64
-                response_data = {
-                    "audio_data": base64.b64encode(result.audio_data).decode("utf-8"),
-                    "sample_rate": result.sample_rate,
-                    "duration_seconds": result.duration_seconds,
-                    "format": result.format,
-                    "performance_metrics": (
-                        result.performance_metrics.model_dump()
-                        if result.performance_metrics
-                        else None
-                    ),
-                }
-                yield {"event": "complete", "data": json.dumps(response_data)}
+                yield {"event": "complete", "data": result.model_dump_json()}
 
     return EventSourceResponse(event_generator())
