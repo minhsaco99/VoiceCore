@@ -88,6 +88,9 @@ class MockTTSEngine(BaseTTSEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
+        reference_audio: bytes | None = None,
+        reference_text: str | None = None,
+        **kwargs,
     ) -> TTSResponse:
         await self._ensure_ready()  # Auto-initialize if needed
         return TTSResponse(
@@ -100,7 +103,13 @@ class MockTTSEngine(BaseTTSEngine):
         )
 
     async def synthesize_stream(
-        self, text: str, **kwargs
+        self,
+        text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        reference_audio: bytes | None = None,
+        reference_text: str | None = None,
+        **kwargs,
     ) -> AsyncIterator[TTSChunk | TTSResponse]:
         await self._ensure_ready()
         yield TTSChunk(

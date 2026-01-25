@@ -63,7 +63,14 @@ def mock_tts_engine():
     )
     engine.synthesize = AsyncMock(return_value=mock_response)
 
-    async def mock_stream_generator(text, **kwargs):
+    async def mock_stream_generator(
+        text,
+        voice=None,
+        speed=1.0,
+        reference_audio=None,
+        reference_text=None,
+        **kwargs,
+    ):
         yield TTSChunk(audio_data=b"chunk1", sequence_number=0)
         yield TTSChunk(audio_data=b"chunk2", sequence_number=1)
         yield mock_response
