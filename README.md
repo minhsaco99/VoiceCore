@@ -191,7 +191,7 @@ Detailed documentation is available in the `docs/` directory:
 
 | Engine | Backend | Status | Features |
 | :--- | :--- | :---: | :--- |
-| **VoxCPM** | `voxcpm` | ✅ Ready | Zero-shot voice cloning, streaming, 24kHz |
+| **VoxCPM** | `voxcpm` | ✅ Ready | Zero-shot voice cloning, streaming |
 | **Coqui TTS** | `TTS` | 🚧 Planned | High-quality open source voices |
 | **OpenAI TTS** | OpenAI API | 🚧 Planned | Natural sounding commercial voices |
 
