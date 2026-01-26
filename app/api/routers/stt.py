@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import (
     APIRouter,
     Depends,
+    Form,
     HTTPException,
     Query,
     WebSocket,
@@ -23,7 +24,7 @@ router = APIRouter()
 async def transcribe_audio(
     audio: Annotated[bytes, Depends(validate_audio_upload)],
     language: str | None = Query(None, description="Language hint"),
-    engine_params: str | None = Query(None, description="JSON engine parameters"),
+    engine_params: str | None = Form(None, description="JSON engine parameters"),
     stt_engine: BaseSTTEngine = Depends(get_stt_engine),
 ):
     """
@@ -32,6 +33,8 @@ async def transcribe_audio(
     Query params:
     - engine: STT engine name (required, e.g., "whisper")
     - language: Optional language hint
+
+    Form params:
     - engine_params: Optional JSON engine parameters
 
     Returns complete transcription with segments and metrics.
@@ -50,8 +53,8 @@ async def transcribe_audio(
 @router.post("/transcribe/stream")
 async def transcribe_audio_stream(
     audio: Annotated[bytes, Depends(validate_audio_upload)],
-    language: str | None = Query(None),
-    engine_params: str | None = Query(None),
+    language: str | None = Query(None, description="Language hint"),
+    engine_params: str | None = Form(None, description="JSON engine parameters"),
     stt_engine: BaseSTTEngine = Depends(get_stt_engine),
 ):
     """
@@ -59,6 +62,10 @@ async def transcribe_audio_stream(
 
     Query params:
     - engine: STT engine name (required, e.g., "whisper")
+    - language: Optional language hint
+
+    Form params:
+    - engine_params: Optional JSON engine parameters
 
     Returns progressive chunks followed by final response.
     Event types: "chunk" (STTChunk), "complete" (STTResponse)

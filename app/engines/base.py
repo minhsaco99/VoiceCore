@@ -194,7 +194,13 @@ class BaseTTSEngine(BaseEngine):
 
     @abstractmethod
     async def synthesize(
-        self, text: str, voice: str | None = None, speed: float = 1.0, **kwargs
+        self,
+        text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        reference_audio: bytes | None = None,
+        reference_text: str | None = None,
+        **kwargs,
     ) -> TTSResponse:
         """
         Synthesize text to speech (invoke/batch mode)
@@ -203,6 +209,8 @@ class BaseTTSEngine(BaseEngine):
             text: Text to synthesize
             voice: Optional voice name (overrides config default)
             speed: Speech speed (1.0 = normal, overrides config default)
+            reference_audio: Reference audio bytes for voice cloning
+            reference_text: Transcript of reference audio for voice cloning
             **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Returns:
@@ -212,7 +220,13 @@ class BaseTTSEngine(BaseEngine):
 
     @abstractmethod
     async def synthesize_stream(
-        self, text: str, **kwargs
+        self,
+        text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        reference_audio: bytes | None = None,
+        reference_text: str | None = None,
+        **kwargs,
     ) -> AsyncIterator[TTSChunk | TTSResponse]:
         """
         Synthesize text to speech (streaming mode)
@@ -222,7 +236,11 @@ class BaseTTSEngine(BaseEngine):
 
         Args:
             text: Text to synthesize
-            **kwargs: Engine-specific params (voice, speed, etc.)
+            voice: Optional voice name (overrides config default)
+            speed: Speech speed (1.0 = normal, overrides config default)
+            reference_audio: Reference audio bytes for voice cloning
+            reference_text: Transcript of reference audio for voice cloning
+            **kwargs: Additional engine-specific parameters (passed via engine_params)
 
         Yields:
             TTSChunk: Audio chunks with progressive generation

@@ -128,17 +128,15 @@ curl http://localhost:8000/api/v1/health
 **Batch Transcription**
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/stt/transcribe?engine=whisper" \
-  -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@/path/to/audio.wav"
+curl -X POST "http://localhost:8000/api/v1/stt/transcribe?engine=whisper&language=en" \
+  -F "audio=@/path/to/audio.wav"
 ```
 
 **Real-time Streaming (SSE)**
 
 ```bash
 curl -N -X POST "http://localhost:8000/api/v1/stt/transcribe/stream?engine=whisper" \
-  -F "file=@/path/to/audio.wav"
+  -F "audio=@/path/to/audio.wav"
 ```
 
 ### 🔊 Text-to-Speech (TTS)
@@ -146,13 +144,24 @@ curl -N -X POST "http://localhost:8000/api/v1/stt/transcribe/stream?engine=whisp
 **Batch Synthesis**
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm&text=Hello%20world"
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm" \
+  -F "text=Hello world"
 ```
 
 **Streaming Synthesis**
 
 ```bash
-curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=voxcpm&text=Hello%20world"
+curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=voxcpm" \
+  -F "text=Hello world"
+```
+
+**Voice Cloning**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm" \
+  -F "text=Hello world" \
+  -F "reference_audio=@/path/to/reference.wav" \
+  -F "reference_text=This is the reference transcript"
 ```
 
 ---
@@ -182,7 +191,7 @@ Detailed documentation is available in the `docs/` directory:
 
 | Engine | Backend | Status | Features |
 | :--- | :--- | :---: | :--- |
-| **VoxCPM** | `voxcpm` | ✅ Ready | Zero-shot voice cloning, streaming, 24kHz |
+| **VoxCPM** | `voxcpm` | ✅ Ready | Zero-shot voice cloning, streaming |
 | **Coqui TTS** | `TTS` | 🚧 Planned | High-quality open source voices |
 | **OpenAI TTS** | OpenAI API | 🚧 Planned | Natural sounding commercial voices |
 

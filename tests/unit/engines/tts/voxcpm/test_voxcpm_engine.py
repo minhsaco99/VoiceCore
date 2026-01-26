@@ -40,12 +40,13 @@ def mock_voxcpm_model():
     # Mock generate method - returns numpy array
     mock_model.generate.return_value = np.zeros(16000, dtype=np.float32)  # 1 second
 
-    # Mock generate_streaming - yields chunks
+    # Mock generate_streaming - yields chunks (use MagicMock to track calls)
     def mock_streaming(*args, **kwargs):
         yield np.zeros(4000, dtype=np.float32)  # 0.25 second chunk
         yield np.zeros(4000, dtype=np.float32)  # 0.25 second chunk
 
-    mock_model.generate_streaming = mock_streaming
+    # Wrap in MagicMock to track call arguments
+    mock_model.generate_streaming = MagicMock(side_effect=mock_streaming)
 
     return mock_model
 
@@ -206,44 +207,25 @@ class TestVoxCPMSynthesize:
         assert call_kwargs["denoise"] == config.denoise
 
     @pytest.mark.asyncio
-    async def test_synthesize_with_voice_cloning(
-        self, config, mock_voxcpm_model, tmp_path
-    ):
+    async def test_synthesize_with_voice_cloning(self, config, mock_voxcpm_model):
         """Synthesize should accept voice cloning parameters."""
         engine = VoxCPMEngine(config)
         engine._model = mock_voxcpm_model
         engine._initialized = True
 
-        # Create a temporary audio file
-        prompt_file = tmp_path / "prompt.wav"
-        prompt_file.touch()
+        # Use bytes for reference audio
+        reference_audio = b"fake audio bytes"
 
         await engine.synthesize(
             "Hello",
-            prompt_wav_path=str(prompt_file),
-            prompt_text="Reference text",
+            reference_audio=reference_audio,
+            reference_text="Reference text",
         )
 
         call_kwargs = mock_voxcpm_model.generate.call_args.kwargs
-        assert call_kwargs["prompt_wav_path"] == str(prompt_file)
+        # Engine saves bytes to temp file and passes path
+        assert call_kwargs["prompt_wav_path"] is not None
         assert call_kwargs["prompt_text"] == "Reference text"
-
-    @pytest.mark.asyncio
-    async def test_synthesize_error_on_missing_prompt_file(
-        self, config, mock_voxcpm_model
-    ):
-        """Synthesize should raise error if prompt file doesn't exist."""
-        engine = VoxCPMEngine(config)
-        engine._model = mock_voxcpm_model
-        engine._initialized = True
-
-        with pytest.raises(SynthesisError) as exc_info:
-            await engine.synthesize(
-                "Hello",
-                prompt_wav_path="/nonexistent/file.wav",
-            )
-
-        assert "not found" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_synthesize_wraps_model_errors(self, config, mock_voxcpm_model):
@@ -258,6 +240,20 @@ class TestVoxCPMSynthesize:
             await engine.synthesize("Test")
 
         assert "Model failed" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_synthesize_reraises_typed_errors(self, config, mock_voxcpm_model):
+        """Synthesize should re-raise SynthesisError as-is without wrapping."""
+        engine = VoxCPMEngine(config)
+        engine._model = mock_voxcpm_model
+        engine._initialized = True
+
+        mock_voxcpm_model.generate.side_effect = SynthesisError("Already typed error")
+
+        with pytest.raises(SynthesisError) as exc_info:
+            await engine.synthesize("Test")
+
+        assert "Already typed error" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_synthesize_model_not_loaded(self, config):
@@ -338,19 +334,25 @@ class TestVoxCPMStreaming:
         assert "not loaded" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_stream_missing_prompt_file(self, config, mock_voxcpm_model):
-        """Stream should raise SynthesisError if prompt file doesn't exist."""
+    async def test_stream_with_reference_audio(self, config, mock_voxcpm_model):
+        """Stream should accept reference_audio bytes."""
         engine = VoxCPMEngine(config)
         engine._model = mock_voxcpm_model
         engine._initialized = True
 
-        with pytest.raises(SynthesisError) as exc_info:
-            async for _ in engine.synthesize_stream(
-                "Test", prompt_wav_path="/nonexistent.wav"
-            ):
-                pass
+        reference_audio = b"fake audio bytes"
+        results = []
+        async for item in engine.synthesize_stream(
+            "Test",
+            reference_audio=reference_audio,
+            reference_text="Reference",
+        ):
+            results.append(item)
 
-        assert "not found" in str(exc_info.value)
+        # Verify model was called with prompt_wav_path (temp file path)
+        call_kwargs = mock_voxcpm_model.generate_streaming.call_args[1]
+        assert call_kwargs["prompt_wav_path"] is not None
+        assert call_kwargs["prompt_text"] == "Reference"
 
     @pytest.mark.asyncio
     async def test_stream_empty_result(self, config, mock_voxcpm_model):

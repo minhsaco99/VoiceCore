@@ -422,6 +422,8 @@ class MyTTSEngine(BaseTTSEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
+        reference_audio: bytes | None = None,
+        reference_text: str | None = None,
         **kwargs
     ) -> TTSResponse:
         """
@@ -431,6 +433,8 @@ class MyTTSEngine(BaseTTSEngine):
             text: Text to synthesize
             voice: Voice name (uses default if None)
             speed: Speech speed multiplier
+            reference_audio: Reference audio bytes for voice cloning (optional)
+            reference_text: Transcript of reference audio (required with reference_audio)
             **kwargs: Additional engine parameters
 
         Returns:
@@ -448,6 +452,21 @@ class MyTTSEngine(BaseTTSEngine):
         processing_start = time.time()
         try:
             # Your synthesis logic here
+            # If your model supports voice cloning:
+            if reference_audio is not None:
+                # Option 1: Model accepts bytes directly
+                # audio_data = self._model.synthesize(
+                #     text, reference_audio=reference_audio, reference_text=reference_text
+                # )
+
+                # Option 2: Model requires file path - use temp_audio_file helper
+                # from app.utils.audio import temp_audio_file
+                # with temp_audio_file(reference_audio) as ref_path:
+                #     audio_data = self._model.synthesize(
+                #         text, prompt_wav_path=ref_path, prompt_text=reference_text
+                #     )
+                pass
+
             audio_data = b"..."  # Generated audio bytes
             duration_seconds = 1.0  # Calculated duration
 
@@ -482,12 +501,24 @@ class MyTTSEngine(BaseTTSEngine):
     async def synthesize_stream(
         self,
         text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        reference_audio: bytes | None = None,
+        reference_text: str | None = None,
         **kwargs
     ) -> AsyncIterator[TTSChunk | TTSResponse]:
         """
         Streaming synthesis.
 
         Yields TTSChunk for audio chunks, then TTSResponse for final.
+
+        Args:
+            text: Text to synthesize
+            voice: Voice name (uses default if None)
+            speed: Speech speed multiplier
+            reference_audio: Reference audio bytes for voice cloning (optional)
+            reference_text: Transcript of reference audio (required with reference_audio)
+            **kwargs: Additional engine parameters
         """
         start_time = time.time()
         total_chunks = 0
@@ -627,6 +658,8 @@ class BaseTTSEngine(BaseEngine):
         text: str,
         voice: str | None = None,
         speed: float = 1.0,
+        reference_audio: bytes | None = None,
+        reference_text: str | None = None,
         **kwargs
     ) -> TTSResponse: ...
 
@@ -634,6 +667,10 @@ class BaseTTSEngine(BaseEngine):
     async def synthesize_stream(
         self,
         text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        reference_audio: bytes | None = None,
+        reference_text: str | None = None,
         **kwargs
     ) -> AsyncIterator[TTSChunk | TTSResponse]: ...
 

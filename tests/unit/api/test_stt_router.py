@@ -55,7 +55,8 @@ class TestTranscribeEndpoint:
         """Returns 400 for invalid JSON in engine_params"""
         response = client.post(
             "/api/v1/stt/transcribe",
-            params={"engine": "default", "engine_params": "invalid json{"},
+            params={"engine": "default"},
+            data={"engine_params": "invalid json{"},
             files={"audio": ("test.wav", test_audio_bytes, "audio/wav")},
         )
 
@@ -68,7 +69,8 @@ class TestTranscribeEndpoint:
         """Passes valid engine_params to engine"""
         response = client.post(
             "/api/v1/stt/transcribe",
-            params={"engine": "default", "engine_params": '{"beam_size": 5}'},
+            params={"engine": "default"},
+            data={"engine_params": '{"beam_size": 5}'},
             files={"audio": ("test.wav", test_audio_bytes, "audio/wav")},
         )
 
@@ -181,7 +183,8 @@ class TestTranscribeStreamEndpoint:
         """Returns 400 for invalid JSON"""
         response = client.post(
             "/api/v1/stt/transcribe/stream",
-            params={"engine": "default", "engine_params": "bad json"},
+            params={"engine": "default"},
+            data={"engine_params": "bad json"},
             files={"audio": ("test.wav", test_audio_bytes, "audio/wav")},
         )
 
@@ -307,7 +310,8 @@ class TestTranscribeEdgeCases:
         # should convert to 500.
         response = client.post(
             "/api/v1/stt/transcribe",
-            params={"engine": "default", "engine_params": '["array"]'},
+            params={"engine": "default"},
+            data={"engine_params": '["array"]'},
             files={"audio": ("test.wav", test_audio_bytes, "audio/wav")},
         )
 

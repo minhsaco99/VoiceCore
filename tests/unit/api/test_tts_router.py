@@ -10,7 +10,8 @@ class TestSynthesizeEndpoint:
         """Returns 200 with valid text and audio data"""
         response = client_both.post(
             "/api/v1/tts/synthesize",
-            params={"text": "Hello world", "engine": "default"},
+            params={"engine": "default"},
+            data={"text": "Hello world"},
         )
 
         assert response.status_code == 200
@@ -37,7 +38,8 @@ class TestSynthesizeEndpoint:
         """Returns 404 when engine not found"""
         response = client_both.post(
             "/api/v1/tts/synthesize",
-            params={"text": "Hello", "engine": "nonexistent"},
+            params={"engine": "nonexistent"},
+            data={"text": "Hello"},
         )
 
         assert response.status_code == 404
@@ -46,9 +48,9 @@ class TestSynthesizeEndpoint:
         """Returns 400 for invalid JSON in engine_params"""
         response = client_both.post(
             "/api/v1/tts/synthesize",
-            params={
+            params={"engine": "default"},
+            data={
                 "text": "Hello",
-                "engine": "default",
                 "engine_params": "invalid json{",
             },
         )
@@ -60,9 +62,9 @@ class TestSynthesizeEndpoint:
         """Passes valid engine_params to engine"""
         response = client_both.post(
             "/api/v1/tts/synthesize",
-            params={
+            params={"engine": "default"},
+            data={
                 "text": "Hello",
-                "engine": "default",
                 "engine_params": '{"pitch": 1.5}',
             },
         )
@@ -78,17 +80,34 @@ class TestSynthesizeEndpoint:
         response = client_both.post(
             "/api/v1/tts/synthesize",
             params={
-                "text": "Hello",
                 "engine": "default",
                 "voice": "voice2",
                 "speed": 1.5,
             },
+            data={"text": "Hello"},
         )
 
         assert response.status_code == 200
         call_kwargs = mock_tts_engine.synthesize.call_args.kwargs
         assert call_kwargs.get("voice") == "voice2"
         assert call_kwargs.get("speed") == 1.5
+
+    def test_passes_reference_audio_and_text(self, client_both, mock_tts_engine):
+        """Passes reference_audio and reference_text to engine for voice cloning"""
+        response = client_both.post(
+            "/api/v1/tts/synthesize",
+            params={"engine": "default"},
+            data={
+                "text": "Hello",
+                "reference_text": "Reference transcript",
+            },
+            files={"reference_audio": ("ref.wav", b"fake audio data", "audio/wav")},
+        )
+
+        assert response.status_code == 200
+        call_kwargs = mock_tts_engine.synthesize.call_args.kwargs
+        assert call_kwargs.get("reference_audio") == b"fake audio data"
+        assert call_kwargs.get("reference_text") == "Reference transcript"
 
 
 class TestSynthesizeStreamEndpoint:
@@ -98,7 +117,8 @@ class TestSynthesizeStreamEndpoint:
         """Returns 200 with event-stream content type"""
         response = client_both.post(
             "/api/v1/tts/synthesize/stream",
-            params={"text": "Hello", "engine": "default"},
+            params={"engine": "default"},
+            data={"text": "Hello"},
         )
 
         assert response.status_code == 200
@@ -108,7 +128,8 @@ class TestSynthesizeStreamEndpoint:
         """Streams chunk events and complete event"""
         response = client_both.post(
             "/api/v1/tts/synthesize/stream",
-            params={"text": "Hello", "engine": "default"},
+            params={"engine": "default"},
+            data={"text": "Hello"},
         )
 
         # Parse SSE events
@@ -128,9 +149,9 @@ class TestSynthesizeStreamEndpoint:
         """Returns 400 for invalid JSON in engine_params"""
         response = client_both.post(
             "/api/v1/tts/synthesize/stream",
-            params={
+            params={"engine": "default"},
+            data={
                 "text": "Hello",
-                "engine": "default",
                 "engine_params": "bad json",
             },
         )
@@ -143,9 +164,9 @@ class TestSynthesizeStreamEndpoint:
         """Passes engine_params to engine in stream mode"""
         response = client_both.post(
             "/api/v1/tts/synthesize/stream",
-            params={
+            params={"engine": "default"},
+            data={
                 "text": "Hello",
-                "engine": "default",
                 "engine_params": '{"style": "happy"}',
             },
         )
@@ -156,3 +177,20 @@ class TestSynthesizeStreamEndpoint:
         mock_tts_engine.synthesize_stream.assert_called_once()
         call_kwargs = mock_tts_engine.synthesize_stream.call_args.kwargs
         assert call_kwargs.get("style") == "happy"
+
+    def test_passes_reference_audio_stream(self, client_both, mock_tts_engine):
+        """Passes reference_audio to engine in stream mode"""
+        response = client_both.post(
+            "/api/v1/tts/synthesize/stream",
+            params={"engine": "default"},
+            data={
+                "text": "Hello",
+                "reference_text": "Reference",
+            },
+            files={"reference_audio": ("ref.wav", b"audio bytes", "audio/wav")},
+        )
+
+        assert response.status_code == 200
+        call_kwargs = mock_tts_engine.synthesize_stream.call_args.kwargs
+        assert call_kwargs.get("reference_audio") == b"audio bytes"
+        assert call_kwargs.get("reference_text") == "Reference"

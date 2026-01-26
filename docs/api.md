@@ -79,18 +79,23 @@ Batch transcription - upload audio file and receive complete transcription.
 |-----------|------|----------|-------------|
 | `engine` | string | Yes | Engine name (e.g., "whisper") |
 | `language` | string | No | Language hint (e.g., "en", "es") |
+
+**Form Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `audio` | file | Yes | Audio file (wav, mp3, flac, ogg, m4a, opus) |
 | `engine_params` | string | No | JSON string with engine-specific parameters |
 
 **Request:**
 
 - Content-Type: `multipart/form-data`
-- Body: `file` - Audio file (wav, mp3, flac, ogg, m4a, opus)
 
 **Example:**
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/stt/transcribe?engine=whisper&language=en" \
-  -F "file=@audio.wav"
+  -F "audio=@audio.wav"
 ```
 
 **Response:**
@@ -249,15 +254,36 @@ Batch synthesis - convert text to speech audio.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `engine` | string | Yes | Engine name (e.g., "voxcpm") |
-| `text` | string | Yes | Text to synthesize |
 | `voice` | string | No | Voice name/ID to use |
 | `speed` | float | No | Speech speed multiplier (0 < speed <= 3.0, default: 1.0) |
+
+**Form Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `text` | string | Yes | Text to synthesize |
+| `reference_audio` | file | No | Reference audio file for voice cloning |
+| `reference_text` | string | No | Transcript of reference audio (required with reference_audio) |
 | `engine_params` | string | No | JSON string with engine-specific parameters |
+
+**Request:**
+
+- Content-Type: `multipart/form-data`
 
 **Example:**
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm&text=Hello%20world"
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm" \
+  -F "text=Hello world"
+```
+
+**Voice Cloning Example:**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm" \
+  -F "text=Hello world" \
+  -F "reference_audio=@/path/to/reference.wav" \
+  -F "reference_text=This is the reference transcript"
 ```
 
 **Response:**
@@ -286,6 +312,14 @@ SSE (Server-Sent Events) streaming synthesis - receive progressive audio chunks.
 
 Same as `/tts/synthesize`.
 
+**Form Parameters:**
+
+Same as `/tts/synthesize`.
+
+**Request:**
+
+- Content-Type: `multipart/form-data`
+
 **Response:**
 
 Server-Sent Events stream with two event types:
@@ -307,32 +341,32 @@ data: {"audio_data": "<base64-full-audio>", "sample_rate": 22050, "duration_seco
 **Example:**
 
 ```bash
-curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=voxcpm&text=Hello%20world"
+curl -N -X POST "http://localhost:8000/api/v1/tts/synthesize/stream?engine=voxcpm" \
+  -F "text=Hello world"
 ```
 
 **JavaScript Client Example:**
 
 ```javascript
-const params = new URLSearchParams({
-  engine: 'voxcpm',
-  text: 'Hello, how are you today?'
-});
+const formData = new FormData();
+formData.append('text', 'Hello, how are you today?');
 
-const eventSource = new EventSource(
-  `http://localhost:8000/api/v1/tts/synthesize/stream?${params}`
+const response = await fetch(
+  'http://localhost:8000/api/v1/tts/synthesize/stream?engine=voxcpm',
+  { method: 'POST', body: formData }
 );
 
-eventSource.addEventListener('chunk', (event) => {
-  const chunk = JSON.parse(event.data);
-  // Process audio chunk
-  console.log('Chunk:', chunk.sequence_number);
-});
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
 
-eventSource.addEventListener('complete', (event) => {
-  const result = JSON.parse(event.data);
-  console.log('Complete, duration:', result.duration_seconds);
-  eventSource.close();
-});
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  const text = decoder.decode(value);
+  // Parse SSE events from text
+  console.log('Received:', text);
+}
 ```
 
 ---
@@ -474,7 +508,7 @@ All errors follow this format:
 
 ### Whisper (faster-whisper)
 
-Pass these via `engine_params` query parameter as JSON string.
+Pass these via `engine_params` form parameter as JSON string.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -489,29 +523,34 @@ Pass these via `engine_params` query parameter as JSON string.
 **Example:**
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/stt/transcribe?engine=whisper&engine_params={\"beam_size\":3,\"vad_filter\":true}" \
-  -F "file=@audio.wav"
+curl -X POST "http://localhost:8000/api/v1/stt/transcribe?engine=whisper" \
+  -F "audio=@audio.wav" \
+  -F 'engine_params={"beam_size":3,"vad_filter":true}'
 ```
 
 ### VoxCPM (Text-to-Speech)
 
-Pass these via `engine_params` query parameter as JSON string.
+VoxCPM supports zero-shot voice cloning using reference audio. Pass the reference audio and its transcript using the top-level form parameters.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `prompt_wav_path` | string | null | Path to reference audio for zero-shot voice cloning |
-| `prompt_text` | string | null | Transcript of the reference audio (required with prompt_wav_path) |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `reference_audio` | file | Reference audio file for voice cloning (wav format recommended) |
+| `reference_text` | string | Transcript of the reference audio (required with reference_audio) |
 
 **Basic Example:**
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm&text=Hello%20world"
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm" \
+  -F "text=Hello world"
 ```
 
 **Voice Cloning Example:**
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm&text=Hello%20world&engine_params={\"prompt_wav_path\":\"/path/to/reference.wav\",\"prompt_text\":\"This%20is%20the%20reference%20transcript\"}"
+curl -X POST "http://localhost:8000/api/v1/tts/synthesize?engine=voxcpm" \
+  -F "text=Hello world" \
+  -F "reference_audio=@/path/to/reference.wav" \
+  -F "reference_text=This is the reference transcript"
 ```
 
 ---
