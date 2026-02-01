@@ -11,6 +11,19 @@ stt:
       compute_type: "float16"
       timeout_seconds: 300
 
+  # Qwen3-ASR: State-of-the-art multilingual ASR (52 languages)
+  # Install: uv sync --group qwen3-asr
+  qwen3-asr:
+    enabled: true
+    engine_class: "app.engines.stt.qwen3asr.engine.Qwen3ASREngine"
+    config:
+      model_name: "Qwen/Qwen3-ASR-1.7B"
+      forced_aligner: "Qwen/Qwen3-ForcedAligner-0.6B" # Enable for timestamps
+      device: "cuda"
+      gpu_memory_utilization: 0.7
+      max_new_tokens: 512
+      # language: "Vietnamese"  # Set for specific language, or leave empty for auto-detect
+
   # Example: Google STT (disabled by default)
   # google:
   #   enabled: false
