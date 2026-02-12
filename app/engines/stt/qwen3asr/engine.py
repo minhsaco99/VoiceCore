@@ -177,10 +177,7 @@ class Qwen3ASREngine(BaseSTTEngine):
         self, audio_data: AudioInput, language: str | None = None, **kwargs
     ) -> AsyncIterator[STTChunk | STTResponse]:
         """
-        Transcribe audio in streaming mode
-
-        For Qwen3-ASR, we simulate streaming by processing the audio
-        and yielding the result as a single chunk, followed by final response.
+        Transcribe audio in streaming mode using Qwen3-ASR streaming API
 
         Args:
             audio_data: Audio input (bytes, numpy array, file path, or BytesIO)
@@ -209,43 +206,75 @@ class Qwen3ASREngine(BaseSTTEngine):
                 audio_array, sample_rate
             )
 
+            # Resample to 16kHz if needed (Qwen3 streaming demo uses 16kHz)
+            if sample_rate != 16000:
+                audio_array = self._audio_processor.resample_to_16khz(
+                    audio_array, sample_rate
+                )
+                sample_rate = 16000
+
             # Prepare language
             lang = self._map_language(language or self.qwen_config.language)
 
-            # Process with Qwen3-ASR
+            # Initialize streaming state from Qwen3ASRModel
+            # Note: We need to access the underlying model for streaming methods
+            # self._model is Qwen3ASRModel.LLM instance
+            state = self._model.init_streaming_state(
+                unfixed_chunk_num=self.qwen_config.unfixed_chunk_num,
+                unfixed_token_num=self.qwen_config.unfixed_token_num,
+                chunk_size_sec=self.qwen_config.chunk_size_sec,
+            )
+            # Set language if provided
+            if lang:
+                state.language = lang
+
             processing_start = time.time()
-            results = self._model.transcribe(
-                audio=(audio_array, sample_rate),
-                language=lang,
-                return_time_stamps=(self.qwen_config.forced_aligner is not None),
-            )
-            first_token_time = time.time()
+            first_token_time = None
 
-            # Extract result
-            if results and len(results) > 0:
-                result = results[0]
-                text = result.text if hasattr(result, "text") else str(result)
-                detected_language = (
-                    result.language if hasattr(result, "language") else lang
+            # Streaming parameters
+            chunk_size_samples = int(self.qwen_config.chunk_size_sec * sample_rate)
+            pos = 0
+
+            # Process chunks
+            while pos < len(audio_array):
+                # Extract chunk
+                end_pos = min(pos + chunk_size_samples, len(audio_array))
+                chunk = audio_array[pos:end_pos]
+                pos = end_pos
+
+                # Streaming inference
+                self._model.streaming_transcribe(chunk, state)
+
+                # Capture first token time
+                if first_token_time is None:
+                    first_token_time = time.time()
+
+                current_text = getattr(state, "text", "") or ""
+
+                # Yield current state as chunk
+                # Note: Qwen streaming accumulates text in state.text
+                chunk_latency_ms = (time.time() - processing_start) * 1000
+                yield STTChunk(
+                    text=current_text,
+                    timestamp=float(pos) / sample_rate,
+                    confidence=None,
+                    chunk_latency_ms=chunk_latency_ms,
                 )
-            else:
-                text = ""
-                detected_language = lang
 
-            # Yield single chunk (simulated streaming)
-            chunk_latency_ms = (time.time() - processing_start) * 1000
-            yield STTChunk(
-                text=text,
-                timestamp=0.0,
-                confidence=None,
-                chunk_latency_ms=chunk_latency_ms,
-            )
+            # Finish streaming
+            self._model.finish_streaming_transcribe(state)
+            final_text = getattr(state, "text", "") or ""
+            detected_language = getattr(state, "language", "") or lang
 
             # Calculate final metrics
             end_time = time.time()
             total_duration_ms = (end_time - start_time) * 1000
+
+            if first_token_time is None:
+                first_token_time = end_time
+
             time_to_first_token_ms = (first_token_time - start_time) * 1000
-            processing_time_ms = (first_token_time - processing_start) * 1000
+            processing_time_ms = (end_time - processing_start) * 1000
 
             metrics = STTPerformanceMetrics(
                 latency_ms=total_duration_ms,
@@ -258,28 +287,14 @@ class Qwen3ASREngine(BaseSTTEngine):
                 ),
                 time_to_first_token_ms=time_to_first_token_ms,
                 total_stream_duration_ms=total_duration_ms,
-                total_chunks=1,
+                total_chunks=int(len(audio_array) / chunk_size_samples) + 1,
             )
-
-            # Extract timestamps for streaming response
-            results_segments = None
-
-            if hasattr(result, "time_stamps") and result.time_stamps:
-                results_segments = []
-                for seg in result.time_stamps:
-                    results_segments.append(
-                        Segment(
-                            start=float(getattr(seg, "start_time", 0.0)),
-                            end=float(getattr(seg, "end_time", 0.0)),
-                            text=str(getattr(seg, "text", "")),
-                        )
-                    )
 
             # Yield final response
             yield STTResponse(
-                text=text,
+                text=final_text,
                 language=detected_language,
-                segments=results_segments,
+                segments=None,  # Streaming doesn't return full segments list usually
                 performance_metrics=metrics,
             )
 

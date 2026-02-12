@@ -52,6 +52,15 @@ class Qwen3ASRConfig(EngineConfig):
     forced_aligner: str | None = Field(
         default=None, description="Path or name of ForcedAligner model for timestamps."
     )
+    unfixed_chunk_num: int = Field(
+        default=4, description="Number of unfixed chunks for streaming state"
+    )
+    unfixed_token_num: int = Field(
+        default=5, description="Number of unfixed tokens for streaming state"
+    )
+    chunk_size_sec: float = Field(
+        default=1.0, description="Size of each audio chunk in seconds for streaming"
+    )
     language: str | None = Field(
         default=None,
         description="Default language for transcription (e.g., 'en', 'vi').",
