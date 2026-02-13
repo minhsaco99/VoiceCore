@@ -638,6 +638,12 @@ class TestQwen3ASREngineStreaming:
             mock_result.language = "English"
             mock_instance.transcribe.return_value = [mock_result]
 
+            # Mock streaming state
+            mock_state = MagicMock()
+            mock_state.text = "Streaming test"
+            mock_state.language = "English"
+            mock_instance.init_streaming_state.return_value = mock_state
+
             yield mock_instance
 
     @pytest.mark.asyncio
