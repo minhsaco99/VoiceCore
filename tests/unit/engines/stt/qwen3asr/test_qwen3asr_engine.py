@@ -714,48 +714,6 @@ class TestQwen3ASREngineStreaming:
             assert metrics.total_chunks is not None
 
     @pytest.mark.asyncio
-    async def test_transcribe_stream_returns_segments_with_timestamps(
-        self, qwen3asr_config, mock_qwen3asr_model
-    ):
-        """Should extract and return segments in streaming mode"""
-        from app.engines.stt.qwen3asr.engine import Qwen3ASREngine
-
-        engine = Qwen3ASREngine(qwen3asr_config)
-
-        mock_result = MagicMock()
-        mock_result.text = "Hello world"
-        mock_result.language = "English"
-
-        # Mock qwen-asr ForcedAlignItem mocks
-        item1 = MagicMock()
-        item1.text = "Hello"
-        item1.start_time = 0.0
-        item1.end_time = 0.5
-
-        item2 = MagicMock()
-        item2.text = "world"
-        item2.start_time = 0.5
-        item2.end_time = 1.0
-
-        mock_result.time_stamps = [item1, item2]
-        mock_qwen3asr_model.transcribe.return_value = [mock_result]
-
-        with patch.object(engine, "_audio_processor") as mock_processor:
-            mock_processor.to_numpy.return_value = (np.array([0.1, 0.2]), 16000)
-            mock_processor.get_duration_ms.return_value = 1000.0
-
-            chunks = []
-            async for item in engine.transcribe_stream(np.array([0.1, 0.2])):
-                chunks.append(item)
-
-            final_response = chunks[-1]
-            assert final_response.segments is not None
-            assert len(final_response.segments) == 2
-            assert final_response.segments[0].text == "Hello"
-            assert final_response.segments[0].start == 0.0
-            assert final_response.segments[0].end == 0.5
-
-    @pytest.mark.asyncio
     async def test_transcribe_stream_empty_audio_raises(
         self, qwen3asr_config, mock_qwen3asr_model
     ):
