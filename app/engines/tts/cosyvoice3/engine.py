@@ -47,7 +47,12 @@ class CosyVoice3Engine(BaseTTSEngine):
 
     async def _initialize(self) -> None:
         """
-        Create persistent HTTP client and verify server connectivity.
+        Create persistent HTTP client and optionally verify server connectivity.
+
+        The health check is best-effort: a warning is logged if the server is
+        unreachable, but the engine still becomes ready. This allows the engine
+        to be initialized before the CosyVoice3 server is fully started, since
+        the actual connection will be made on the first synthesis request.
         """
         try:
             import httpx
@@ -68,7 +73,7 @@ class CosyVoice3Engine(BaseTTSEngine):
             timeout=timeout,
         )
 
-        # Verify server is reachable
+        # Best-effort health check (server may start later)
         try:
             response = await self._client.get("/docs")
             logger.info(
@@ -78,7 +83,7 @@ class CosyVoice3Engine(BaseTTSEngine):
             )
         except Exception as e:
             logger.warning(
-                "CosyVoice3 server at %s may not be reachable: %s",
+                "CosyVoice3 server at %s may not be reachable yet: %s",
                 self.cv3_config.service_url,
                 e,
             )
@@ -88,6 +93,31 @@ class CosyVoice3Engine(BaseTTSEngine):
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+
+    def _validate_dynamic_path(self, wav_path: str) -> None:
+        """
+        Validate that a dynamically-provided prompt_wav_path is within
+        allowed directories to prevent arbitrary file read / path traversal.
+
+        Raises:
+            SynthesisError: If the path is outside allowed directories.
+        """
+        allowed_dirs = self.cv3_config.allowed_voice_dirs
+        if not allowed_dirs:
+            raise SynthesisError(
+                "Dynamic prompt_wav_path is not allowed. "
+                "Configure 'allowed_voice_dirs' or use a named voice."
+            )
+
+        resolved = Path(wav_path).resolve()
+        for allowed_dir in allowed_dirs:
+            if resolved.is_relative_to(Path(allowed_dir).resolve()):
+                return
+
+        raise SynthesisError(
+            f"prompt_wav_path '{wav_path}' is outside allowed directories: "
+            f"{allowed_dirs}"
+        )
 
     def _resolve_voice(
         self,
@@ -100,7 +130,7 @@ class CosyVoice3Engine(BaseTTSEngine):
         Resolve voice to prompt_wav_path, prompt_text, and reference_audio bytes.
 
         Priority:
-        1. Dynamic prompt_wav_path + prompt_text from kwargs
+        1. Dynamic prompt_wav_path + prompt_text from kwargs (validated)
         2. reference_audio bytes (API-level voice cloning)
         3. Configured voice name
         4. Default voice
@@ -108,10 +138,11 @@ class CosyVoice3Engine(BaseTTSEngine):
         Returns:
             (prompt_wav_path, prompt_text, reference_audio_bytes)
         """
-        # 1. Dynamic path/text override from kwargs
+        # 1. Dynamic path/text override from kwargs (security-validated)
         dyn_wav_path = kwargs.get("prompt_wav_path")
         dyn_prompt_text = kwargs.get("prompt_text")
         if dyn_wav_path and dyn_prompt_text:
+            self._validate_dynamic_path(dyn_wav_path)
             return dyn_wav_path, dyn_prompt_text, None
 
         # 2. Direct reference audio takes priority
@@ -202,7 +233,7 @@ class CosyVoice3Engine(BaseTTSEngine):
         self,
         text: str,
         voice: str | None = None,
-        speed: float = 1.0,
+        speed: float | None = None,
         reference_audio: bytes | None = None,
         reference_text: str | None = None,
         **kwargs,
@@ -216,10 +247,10 @@ class CosyVoice3Engine(BaseTTSEngine):
         Args:
             text: Text to synthesize
             voice: Voice name from config.voices (or None for default)
-            speed: Speech speed multiplier
+            speed: Speech speed multiplier (None = use config default)
             reference_audio: Reference audio bytes for voice cloning (overrides voice)
             reference_text: Transcript of reference audio
-            **kwargs: Additional parameters (ignored)
+            **kwargs: Additional parameters (prompt_wav_path, prompt_text)
 
         Returns:
             TTSResponse with WAV audio data and metrics
@@ -236,7 +267,7 @@ class CosyVoice3Engine(BaseTTSEngine):
             voice, reference_audio, reference_text, **kwargs
         )
         prompt_text = self._prepare_prompt_text(prompt_text)
-        effective_speed = speed if speed != 1.0 else self.cv3_config.speed
+        effective_speed = speed if speed is not None else self.cv3_config.speed
 
         # Use temp file if reference_audio bytes provided, otherwise use configured path
         with temp_audio_file(ref_audio_bytes) as temp_path:
@@ -248,17 +279,18 @@ class CosyVoice3Engine(BaseTTSEngine):
             processing_start = time.time()
 
             # Collect all PCM chunks
-            pcm_data = b""
+            pcm_chunks: list[bytes] = []
             async for chunk in self._call_inference(
                 tts_text=text,
                 prompt_wav_path=wav_path,
                 prompt_text=prompt_text,
                 speed=effective_speed,
             ):
-                pcm_data += chunk
+                pcm_chunks.append(chunk)
 
         processing_end = time.time()
 
+        pcm_data = b"".join(pcm_chunks)
         if len(pcm_data) == 0:
             raise SynthesisError("CosyVoice3 returned empty audio")
 
@@ -302,7 +334,7 @@ class CosyVoice3Engine(BaseTTSEngine):
         self,
         text: str,
         voice: str | None = None,
-        speed: float = 1.0,
+        speed: float | None = None,
         reference_audio: bytes | None = None,
         reference_text: str | None = None,
         **kwargs,
@@ -316,10 +348,10 @@ class CosyVoice3Engine(BaseTTSEngine):
         Args:
             text: Text to synthesize
             voice: Voice name from config.voices (or None for default)
-            speed: Speech speed multiplier
+            speed: Speech speed multiplier (None = use config default)
             reference_audio: Reference audio bytes for voice cloning (overrides voice)
             reference_text: Transcript of reference audio
-            **kwargs: Additional parameters (ignored)
+            **kwargs: Additional parameters (prompt_wav_path, prompt_text)
 
         Yields:
             TTSChunk: Audio chunks with progressive generation
@@ -328,7 +360,7 @@ class CosyVoice3Engine(BaseTTSEngine):
         start_time = time.time()
         first_chunk_time = None
         total_chunks = 0
-        all_pcm_data = b""
+        all_pcm_chunks: list[bytes] = []
 
         await self._ensure_ready()
 
@@ -340,7 +372,7 @@ class CosyVoice3Engine(BaseTTSEngine):
             voice, reference_audio, reference_text, **kwargs
         )
         prompt_text = self._prepare_prompt_text(prompt_text)
-        effective_speed = speed if speed != 1.0 else self.cv3_config.speed
+        effective_speed = speed if speed is not None else self.cv3_config.speed
 
         with temp_audio_file(ref_audio_bytes) as temp_path:
             wav_path = temp_path or prompt_wav_path
@@ -360,7 +392,7 @@ class CosyVoice3Engine(BaseTTSEngine):
                     if first_chunk_time is None:
                         first_chunk_time = chunk_time
 
-                    all_pcm_data += pcm_chunk
+                    all_pcm_chunks.append(pcm_chunk)
 
                     # Convert PCM chunk to WAV bytes
                     chunk_array = (
@@ -384,6 +416,7 @@ class CosyVoice3Engine(BaseTTSEngine):
                 # Final response
                 end_time = time.time()
 
+                all_pcm_data = b"".join(all_pcm_chunks)
                 if all_pcm_data:
                     full_array = (
                         np.frombuffer(all_pcm_data, dtype=np.int16).astype(np.float32)

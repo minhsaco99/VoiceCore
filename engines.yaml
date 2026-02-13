@@ -53,6 +53,10 @@ tts:
       sample_rate: 22050
       default_voice: "fin_default"
       voices:
+        fin_default:
+          prompt_wav_path: "/home/phonk/fin_demo/voice_samples/fin_8_segments.wav"
+          prompt_text: "Khiến cho Nguyễn Ánh phải chạy sang Thái Lan nương náu mãi đến đầu vận xấu, nhân lúc Nguyễn Huệ đang lo đối phó với tình hình hỗn loạn trên đất Bắc ."
+          description: "fin_demo voice_7 - fin_8_segments"
         default:
           prompt_wav_path: "/path/to/voice_sample.wav"
           prompt_text: "Transcript of the voice sample audio"

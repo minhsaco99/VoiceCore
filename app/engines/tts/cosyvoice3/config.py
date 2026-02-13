@@ -75,3 +75,10 @@ class CosyVoice3Config(EngineConfig):
         default=None,
         description="HTTP read timeout (None = no timeout for long synthesis)",
     )
+    allowed_voice_dirs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Allowed directories for dynamic prompt_wav_path from API kwargs. "
+            "If empty, dynamic paths are rejected (only configured voices allowed)."
+        ),
+    )
