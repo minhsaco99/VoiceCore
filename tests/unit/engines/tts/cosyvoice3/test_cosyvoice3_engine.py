@@ -303,7 +303,7 @@ class TestCosyVoice3Synthesize:
         mock_stream_ctx.__aexit__ = AsyncMock(return_value=False)
         mock_httpx_client.stream = MagicMock(return_value=mock_stream_ctx)
 
-        with patch("builtins.open", _mock_open()):
+        with patch("pathlib.Path.open", _mock_open()):
             result = await engine.synthesize("Hello world")
 
         assert isinstance(result, TTSResponse)
@@ -330,7 +330,7 @@ class TestCosyVoice3Synthesize:
         mock_stream_ctx.__aexit__ = AsyncMock(return_value=False)
         mock_httpx_client.stream = MagicMock(return_value=mock_stream_ctx)
 
-        with patch("builtins.open", _mock_open()):
+        with patch("pathlib.Path.open", _mock_open()):
             with pytest.raises(SynthesisError) as exc_info:
                 await engine.synthesize("Test")
 
@@ -376,7 +376,7 @@ class TestCosyVoice3Streaming:
         mock_httpx_client.stream = MagicMock(return_value=mock_stream_ctx)
 
         results = []
-        with patch("builtins.open", _mock_open()):
+        with patch("pathlib.Path.open", _mock_open()):
             async for item in engine.synthesize_stream("Hello world"):
                 results.append(item)
 
@@ -413,7 +413,7 @@ class TestCosyVoice3Streaming:
         mock_httpx_client.stream = MagicMock(return_value=mock_stream_ctx)
 
         final_response = None
-        with patch("builtins.open", _mock_open()):
+        with patch("pathlib.Path.open", _mock_open()):
             async for item in engine.synthesize_stream("Test"):
                 if isinstance(item, TTSResponse):
                     final_response = item
@@ -448,7 +448,7 @@ class TestCosyVoice3Streaming:
         mock_httpx_client.stream = MagicMock(return_value=mock_stream_ctx)
 
         results = []
-        with patch("builtins.open", _mock_open()):
+        with patch("pathlib.Path.open", _mock_open()):
             async for item in engine.synthesize_stream("Test"):
                 results.append(item)
 
@@ -477,7 +477,7 @@ class TestCosyVoice3Streaming:
         mock_httpx_client.stream = MagicMock(return_value=mock_stream_ctx)
 
         with (
-            patch("builtins.open", _mock_open()),
+            patch("pathlib.Path.open", _mock_open()),
             pytest.raises(SynthesisError) as exc_info,
         ):
             async for _ in engine.synthesize_stream("Test"):
